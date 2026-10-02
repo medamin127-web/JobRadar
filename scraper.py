@@ -1,6 +1,11 @@
 import pandas as pd
 
 from models import Job
+from services import (
+    JobNormalizer,
+    JobAnalyzer,
+    ExperienceAnalyzer,
+)
 from sources import JobSpySource
 
 
@@ -38,45 +43,16 @@ HOURS_OLD = 72
 
 
 # ==================================================
-# JOBRADAR FIELDS
-# ==================================================
-
-JOB_COLUMNS = [
-    "id",
-    "site",
-    "title",
-    "company",
-    "location",
-    "job_url",
-    "job_url_direct",
-    "date_posted",
-    "job_type",
-    "is_remote",
-    "work_from_home_type",
-    "job_level",
-    "job_function",
-    "salary_source",
-    "interval",
-    "min_amount",
-    "max_amount",
-    "currency",
-    "description",
-    "skills",
-    "experience_range",
-    "company_industry",
-    "company_url",
-    "company_description",
-    "search_term",
-]
-
-
-# ==================================================
-# INITIALIZE SOURCE
+# INITIALIZE
 # ==================================================
 
 source = JobSpySource(
     sites=["linkedin"]
 )
+
+normalizer = JobNormalizer()
+analyzer = JobAnalyzer()
+experience_analyzer = ExperienceAnalyzer()
 
 
 # ==================================================
@@ -84,6 +60,7 @@ source = JobSpySource(
 # ==================================================
 
 all_jobs = []
+
 
 for config in SEARCH_CONFIGS:
 
@@ -108,13 +85,15 @@ for config in SEARCH_CONFIGS:
             hours_old=HOURS_OLD,
         )
 
-        print(f"Found {len(jobs)} jobs")
+        print(
+            f"Found {len(jobs)} jobs"
+        )
 
         all_jobs.append(jobs)
 
 
 # ==================================================
-# 2. COMBINE RESULTS
+# 2. COMBINE RAW RESULTS
 # ==================================================
 
 if all_jobs:
@@ -144,81 +123,54 @@ if not jobs.empty and "job_url" in jobs.columns:
         subset=["job_url"]
     )
 
+
 print(
     f"Unique jobs after deduplication: {len(jobs)}"
 )
 
 
 # ==================================================
-# 4. MAKE SURE REQUIRED COLUMNS EXIST
+# 4. NORMALIZE
 # ==================================================
 
-for column in JOB_COLUMNS:
-
-    if column not in jobs.columns:
-
-        jobs[column] = None
+job_objects = normalizer.normalize_dataframe(
+    jobs
+)
 
 
-# ==================================================
-# 5. KEEP NORMALIZED COLUMNS
-# ==================================================
 
-jobs_clean = jobs[
-    JOB_COLUMNS
-].copy()
-
+print(
+    f"Normalized jobs: {len(job_objects)}"
+)
 
 # ==================================================
-# 6. CONVERT DATAFRAME ROWS INTO JOB OBJECTS
+# 4.5. ANALYZE JOBS
 # ==================================================
 
-job_objects = []
+for job in job_objects:
+    analyzer.analyze(job)
+    experience_analyzer.analyze(job)
 
-for _, row in jobs_clean.iterrows():
+# ==================================================
+# 5. CONVERT NORMALIZED JOBS TO DATAFRAME
+# ==================================================
 
-    job = Job(
-        id=row["id"],
-        site=row["site"],
+if job_objects:
 
-        title=row["title"],
-        company=row["company"],
-        location=row["location"],
-
-        job_url=row["job_url"],
-        job_url_direct=row["job_url_direct"],
-
-        date_posted=row["date_posted"],
-
-        job_type=row["job_type"],
-        is_remote=row["is_remote"],
-        work_from_home_type=row["work_from_home_type"],
-
-        job_level=row["job_level"],
-        job_function=row["job_function"],
-
-        salary_source=row["salary_source"],
-        interval=row["interval"],
-        min_amount=row["min_amount"],
-        max_amount=row["max_amount"],
-        currency=row["currency"],
-
-        description=row["description"],
-        skills=row["skills"],
-        experience_range=row["experience_range"],
-
-        company_industry=row["company_industry"],
-        company_url=row["company_url"],
-        company_description=row["company_description"],
-
-        search_term=row["search_term"],
+    jobs_clean = pd.DataFrame(
+        [
+            job.to_dict()
+            for job in job_objects
+        ]
     )
 
-    job_objects.append(job)
+else:
+
+    jobs_clean = pd.DataFrame()
 
 
 # ==================================================
-# 7. SAVE CSV
+# 6. SAVE
 # ==================================================
 
 jobs_clean.to_csv(
@@ -228,28 +180,48 @@ jobs_clean.to_csv(
 
 
 # ==================================================
-# 8. DISPLAY RESULTS
+# 7. DISPLAY RESULTS
 # ==================================================
 
-print("\nJobRadar dataset:\n")
+print(
+    "\nJobRadar dataset:\n"
+)
+
 
 if job_objects:
 
-    for job in job_objects:
+   for job in job_objects:
 
-        print(
-            f"{job.title} | "
-            f"{job.company} | "
-            f"{job.location}"
-        )
+    print(f"\n{job.title}")
+    print(f"Company: {job.company}")
+    print(f"Location: {job.location}")
+
+    print(
+        f"Skills: "
+        f"{', '.join(job.skills) if job.skills else 'None'}"
+    )
+
+    print(
+        f"Experience: "
+        f"{job.experience_min_years}"
+        f"{'+' if job.experience_min_years and not job.experience_max_years else ''}"
+        f"{' - ' + str(job.experience_max_years) if job.experience_max_years else ''} years"
+    )
+
+    print(
+        f"Seniority: "
+        f"{job.seniority or 'None'}"
+    )
 
 else:
 
-    print("No jobs found.")
+    print(
+        "No jobs found."
+    )
 
 
 # ==================================================
-# 9. FINAL INFORMATION
+# 8. FINAL INFORMATION
 # ==================================================
 
 print(

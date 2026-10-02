@@ -54,8 +54,12 @@ class Job:
     # -------------------------------
 
     description: Optional[str] = None
-    skills: Optional[str] = None
+    skills: Optional[list[str]] = None
     experience_range: Optional[str] = None
+    experience_min_years: Optional[float] = None
+    experience_max_years: Optional[float] = None
+    seniority: Optional[str] = None
+
 
     # -------------------------------
     # Company
