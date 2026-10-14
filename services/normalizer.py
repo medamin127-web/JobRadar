@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 import pandas as pd
 
 from models import Job
@@ -214,7 +217,18 @@ class JobNormalizer:
         if pd.isna(value):
             return None
 
-        value = str(value).strip()
+        # NFKC turns look-alike characters into plain ones: narrow
+        # no-break spaces (U+202F), non-breaking hyphens (U+2011), etc.
+        value = unicodedata.normalize("NFKC", str(value))
+
+        # NFKC keeps U+2010 / U+2011 (typographic hyphens); use a plain "-".
+        value = value.replace("\u2010", "-").replace("\u2011", "-")
+
+        # Soft hyphens and zero-width characters show up as garbage
+        # ("En¡gineer") and break matching.
+        value = re.sub(
+            r"[\u00ad\u200b\u200c\u200d\u2060\ufeff]", "", value
+        ).strip()
 
         if not value:
             return None

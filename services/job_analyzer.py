@@ -41,6 +41,10 @@ class JobAnalyzer:
         ],
         "Go": [
             r"\bgolang\b",
+            r"\bgo\s+(?:developer|engineer|programmer|backend)\b",
+            r"\(go\)",
+            r"(?:python|java|rust|kotlin|typescript|c\+\+|ruby|cloud|aws|kubernetes|docker)\s*(?:,|/|&|and|or)\s*go\b",
+            r"\bgo\s*(?:,|/|&)\s*(?:python|java|rust|kotlin|typescript|c\+\+|ruby|cloud|aws|kubernetes|docker)\b",
         ],
         "Rust": [
             r"\brust\b",
@@ -49,7 +53,10 @@ class JobAnalyzer:
             r"\bkotlin\b",
         ],
         "Swift": [
-            r"\bswift\b",
+            r"\bswiftui\b",
+            r"\bswift\s+(?:developer|programming|language)\b",
+            r"\b(?:ios|xcode|objective-c)\b[^.]{0,40}\bswift\b",
+            r"\bswift\b[^.]{0,40}\b(?:ios|xcode|objective-c)\b",
         ],
 
         # Frontend
@@ -80,10 +87,12 @@ class JobAnalyzer:
             r"\bnode(?:\.js|js)\b",
         ],
         "Express.js": [
-            r"\bexpress(?:\.js|js)?\b",
+            r"\bexpress(?:\.js|js)\b",
+            r"\bnode(?:\.js|js)?\b[^.]{0,30}\bexpress\b",
+            r"\bexpress\b[^.]{0,30}\bnode(?:\.js|js)?\b",
         ],
         "NestJS": [
-            r"\bnest(?:\.js|js)?\b",
+            r"\bnest\.?js\b",
         ],
         "Django": [
             r"\bdjango\b",
@@ -106,8 +115,9 @@ class JobAnalyzer:
             r"\baspnet\b",
         ],
         "Spring": [
-            r"\bspring\b",
-            r"\bspring\s+boot\b",
+            r"\bspring\s+(?:boot|framework|mvc|cloud|security|data|batch)\b",
+            r"\b(?:java|kotlin|hibernate|maven|gradle)\b[^.]{0,40}\bspring\b",
+            r"\bspring\b[^.]{0,40}\b(?:java|kotlin|hibernate|maven|gradle)\b",
         ],
         "Spring Boot": [
             r"\bspring\s+boot\b",
