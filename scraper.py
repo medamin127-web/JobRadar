@@ -1,237 +1,87 @@
-import pandas as pd
+"""
+JobRadar entry point.
 
-from models import Job
-from services import (
-    JobNormalizer,
-    JobAnalyzer,
-    ExperienceAnalyzer,
+    python scraper.py
+
+Searches are configured in config.py, your profile lives in
+candidate_profile.py. Importing this file does nothing; everything
+happens inside main().
+"""
+
+from config import (
+    HOURS_OLD,
+    REPORTS_DIR,
+    RESULTS_PER_SEARCH,
+    SEARCH_CONFIGS,
+    SITES,
 )
-from sources import JobSpySource
-
-
-# ==================================================
-# SEARCH CONFIGURATION
-# ==================================================
-
-SEARCH_CONFIGS = [
-    {
-        "location": "Germany",
-        "search_terms": [
-            "Full Stack Developer",
-            "Full Stack Engineer",
-            "Software Engineer",
-            "Web Developer",
-        ],
-    },
-
-    # Later:
-    #
-    # {
-    #     "location": "Netherlands",
-    #     "search_terms": [
-    #         "Full Stack Developer",
-    #         "Full Stack Engineer",
-    #         "Software Engineer",
-    #         "Web Developer",
-    #     ],
-    # },
-]
-
-
-RESULTS_PER_SEARCH = 10
-HOURS_OLD = 72
-
-
-# ==================================================
-# INITIALIZE
-# ==================================================
-
-source = JobSpySource(
-    sites=["linkedin"]
+from pipeline import collect_jobs, jobs_to_frame, process_jobs
+from reporting import (
+    print_details,
+    print_ranking,
+    print_summary,
+    report_to_file,
 )
-
-normalizer = JobNormalizer()
-analyzer = JobAnalyzer()
-experience_analyzer = ExperienceAnalyzer()
+from storage import fill_missing_descriptions, save_csv_safely, save_raw
 
 
-# ==================================================
-# 1. SCRAPE JOBS
-# ==================================================
-
-all_jobs = []
-
-
-for config in SEARCH_CONFIGS:
-
-    location = config["location"]
-
-    search_terms = config["search_terms"]
-
-    print("\n" + "=" * 60)
-    print(f"Location: {location}")
-    print("=" * 60)
-
-    for search_term in search_terms:
-
-        print(
-            f"\nSearching: {search_term} | {location}"
+def load_profile():
+    try:
+        from candidate_profile import PROFILE
+    except ModuleNotFoundError:
+        raise SystemExit(
+            "candidate_profile.py not found.\n"
+            "Copy candidate_profile.example.py to candidate_profile.py "
+            "and fill in your own details."
         )
 
-        jobs = source.search(
-            search_term=search_term,
-            location=location,
-            results_wanted=RESULTS_PER_SEARCH,
-            hours_old=HOURS_OLD,
+    return PROFILE
+
+
+def build_source():
+    # Imported here so the rest of the project (and the tests) work
+    # even when JobSpy is not installed.
+    from sources import JobSpySource
+
+    return JobSpySource(sites=SITES)
+
+
+def main() -> None:
+    profile = load_profile()
+
+    with report_to_file(REPORTS_DIR):
+
+        # 1. Collect
+        raw = collect_jobs(
+            build_source(),
+            SEARCH_CONFIGS,
+            RESULTS_PER_SEARCH,
+            HOURS_OLD,
         )
 
-        print(
-            f"Found {len(jobs)} jobs"
-        )
+        save_raw(raw)
 
-        all_jobs.append(jobs)
+        # Recover descriptions LinkedIn refused to serve (HTTP 429)
+        # using copies saved by earlier runs.
+        raw = fill_missing_descriptions(raw)
 
+        # 2. De-duplicate, normalize, analyze, score, sort
+        job_objects = process_jobs(raw, profile)
 
-# ==================================================
-# 2. COMBINE RAW RESULTS
-# ==================================================
+        # 3. Save
+        frame = jobs_to_frame(job_objects)
 
-if all_jobs:
+        saved_path = None
 
-    jobs = pd.concat(
-        all_jobs,
-        ignore_index=True
-    )
+        if not frame.empty:
+            saved_path = save_csv_safely(frame)
+            print(f"\nSaved results to {saved_path}")
 
-else:
-
-    jobs = pd.DataFrame()
-
-
-print(
-    f"\nTotal jobs collected: {len(jobs)}"
-)
+        # 4. Report
+        print_ranking(job_objects)
+        print_details(job_objects)
+        print_summary(job_objects, frame, saved_path)
 
 
-# ==================================================
-# 3. REMOVE DUPLICATES
-# ==================================================
-
-if not jobs.empty and "job_url" in jobs.columns:
-
-    jobs = jobs.drop_duplicates(
-        subset=["job_url"]
-    )
-
-
-print(
-    f"Unique jobs after deduplication: {len(jobs)}"
-)
-
-
-# ==================================================
-# 4. NORMALIZE
-# ==================================================
-
-job_objects = normalizer.normalize_dataframe(
-    jobs
-)
-
-
-
-print(
-    f"Normalized jobs: {len(job_objects)}"
-)
-
-# ==================================================
-# 4.5. ANALYZE JOBS
-# ==================================================
-
-for job in job_objects:
-    analyzer.analyze(job)
-    experience_analyzer.analyze(job)
-
-# ==================================================
-# 5. CONVERT NORMALIZED JOBS TO DATAFRAME
-# ==================================================
-
-if job_objects:
-
-    jobs_clean = pd.DataFrame(
-        [
-            job.to_dict()
-            for job in job_objects
-        ]
-    )
-
-else:
-
-    jobs_clean = pd.DataFrame()
-
-
-# ==================================================
-# 6. SAVE
-# ==================================================
-
-jobs_clean.to_csv(
-    "jobs.csv",
-    index=False
-)
-
-
-# ==================================================
-# 7. DISPLAY RESULTS
-# ==================================================
-
-print(
-    "\nJobRadar dataset:\n"
-)
-
-
-if job_objects:
-
-   for job in job_objects:
-
-    print(f"\n{job.title}")
-    print(f"Company: {job.company}")
-    print(f"Location: {job.location}")
-
-    print(
-        f"Skills: "
-        f"{', '.join(job.skills) if job.skills else 'None'}"
-    )
-
-    print(
-        f"Experience: "
-        f"{job.experience_min_years}"
-        f"{'+' if job.experience_min_years and not job.experience_max_years else ''}"
-        f"{' - ' + str(job.experience_max_years) if job.experience_max_years else ''} years"
-    )
-
-    print(
-        f"Seniority: "
-        f"{job.seniority or 'None'}"
-    )
-
-else:
-
-    print(
-        "No jobs found."
-    )
-
-
-# ==================================================
-# 8. FINAL INFORMATION
-# ==================================================
-
-print(
-    f"\nSaved {len(job_objects)} unique jobs to jobs.csv"
-)
-
-print(
-    f"Columns: {len(jobs_clean.columns)}"
-)
-
-print(
-    f"Job objects created: {len(job_objects)}"
-)
+if __name__ == "__main__":
+    main()

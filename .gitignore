@@ -23,10 +23,15 @@ Thumbs.db
 # Logs
 *.log
 
-# Data
+# Data and results (scraped jobs can contain personal data)
 *.csv
 *.json
 *.db
+data/
+reports/
+
+# Personal data: copy candidate_profile.example.py to candidate_profile.py
+candidate_profile.py
 
 # Testing
 .pytest_cache/
