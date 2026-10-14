@@ -93,8 +93,16 @@ class TestEvaluator(unittest.TestCase):
         self.assertEqual(j.eligibility_status, "possible")
         self.assertNotEqual(j.application_bucket, "apply_now")
 
-    def test_relocation_support_without_warnings_is_likely(self):
+    def test_relocation_support_alone_is_possible_not_likely(self):
+        # Relocation help is not visa help (e.g. a bonus for moving
+        # within Germany). Only an explicit visa statement is "likely".
         j = run(job(relocation_support="yes"))
+        self.assertEqual(j.eligibility_status, "possible")
+        self.assertIn("RELOCATION_SUPPORT", j.eligibility_positives)
+        self.assertEqual(j.application_bucket, "apply_with_research")
+
+    def test_visa_support_without_warnings_is_likely(self):
+        j = run(job(visa_sponsorship_status="yes"))
         self.assertEqual(j.eligibility_status, "likely")
         self.assertEqual(j.application_bucket, "apply_now")
 
@@ -126,7 +134,7 @@ class TestBucketRules(unittest.TestCase):
         self.assertEqual(j.application_bucket, "long_shot")
 
     def test_stretch_with_positive_eligibility_is_researched(self):
-        j = run(job(target_category="stretch_target", relocation_support="yes"))
+        j = run(job(target_category="stretch_target", visa_sponsorship_status="yes"))
         self.assertEqual(j.application_bucket, "apply_with_research")
 
     def test_thin_data_goes_to_review(self):

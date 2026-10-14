@@ -205,12 +205,20 @@ def score_jobs(job_objects, profile) -> None:
 # 5. SORT
 # ==================================================
 
+# Inside a bucket, explicit visa support outranks a higher score.
+VISA_RANK = {
+    "yes": 0,
+    "maybe": 1,
+}
+
+
 def sort_jobs(job_objects) -> None:
-    """Bucket first, then score (penalized for missing data)."""
+    """Bucket first, then visa evidence, then score (penalized for missing data)."""
 
     job_objects.sort(
         key=lambda job: (
             BUCKET_ORDER.get(job.application_bucket, 9),
+            VISA_RANK.get(job.visa_sponsorship_status, 2),
             -(job.ranking_score if job.ranking_score is not None else 0),
             -CONFIDENCE_RANK.get(job.confidence, 0),
         )

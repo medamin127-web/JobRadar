@@ -1,4 +1,27 @@
+import re
+
 from models import Job, Profile
+
+
+# Fields whose titles often contain "Software Engineer" / "Developer" but
+# that are outside a web/full-stack profile. When the title names one of
+# them, the generic role match is overruled. A field stops counting as
+# off-target as soon as one of your target_roles mentions it.
+OFF_TARGET_DOMAINS = {
+    "native iOS": r"\bios\b|\bswift\b",
+    "native Android": r"\bandroid\b",
+    "embedded / firmware": r"\bembedded\b|\bfirmware\b",
+    "flight / space software": r"\bflight software\b|\bavionics\b|\bspacecraft\b",
+    "SAP / ABAP": r"\babap\b|\bsap\s+(?:developer|entwickler|berater|consultant|basis)",
+    "mainframe": r"\bmainframe\b|\bcobol\b",
+    "hardware / sensors": r"\bfpga\b|\bhardware\b|\bcalibration\b",
+    "Salesforce": r"\bsalesforce\b",
+}
+
+# Cross-platform mobile titles are fine for a Flutter developer.
+CROSS_PLATFORM = re.compile(r"\bflutter\b|\breact native\b", re.IGNORECASE)
+
+OFF_TARGET_ROLE_SCORE = 15
 
 
 ROLE_FAMILIES = {
@@ -38,7 +61,10 @@ ROLE_FAMILIES = {
         "mobile engineer",
         "flutter developer",
         "android developer",
+        "android engineer",
         "ios developer",
+        "ios engineer",
+        "flutter engineer",
     ],
 }
 
@@ -372,7 +398,40 @@ class JobMatcher:
                     "reason": reason,
                 }
 
+        domain = cls._off_target_domain(job.title or "", profile)
+
+        if domain and best_match["score"] > OFF_TARGET_ROLE_SCORE:
+            best_match = {
+                **best_match,
+                "score": OFF_TARGET_ROLE_SCORE,
+                "match_type": "off_target_domain",
+                "reason": (
+                    f"The title points to {domain} work, which is outside "
+                    "your target roles."
+                ),
+            }
+
         return best_match
+
+    @staticmethod
+    def _off_target_domain(title: str, profile: Profile):
+        """Name of the off-target field the title belongs to, or None."""
+
+        targets = " | ".join(profile.target_roles or [])
+
+        for domain, pattern in OFF_TARGET_DOMAINS.items():
+            if not re.search(pattern, title, re.IGNORECASE):
+                continue
+
+            if re.search(pattern, targets, re.IGNORECASE):
+                continue
+
+            if domain.startswith("native") and CROSS_PLATFORM.search(title):
+                continue
+
+            return domain
+
+        return None
 
     @classmethod
     def _compare_role_families(
