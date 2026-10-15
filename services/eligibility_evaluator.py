@@ -19,6 +19,21 @@ MIN_COVERAGE_TO_RECOMMEND = 60
 # Yearly salary (EUR) above which a role is unlikely to be junior-level.
 SENIOR_SALARY_HINT_EUR = 80000
 
+# Below this match score a job is skipped, whatever its visa signals:
+# a visa is worthless for a job you are not qualified for.
+MIN_SCORE_TO_CONSIDER = 40
+
+# apply_now also needs a clearly good technical match.
+MIN_SCORE_FOR_APPLY_NOW = 60
+
+# A "Senior" title alone does not rule a job out: many senior ads state
+# no years at all. A stretch job is still recommended when the score and
+# the skills fit and the ad asks for at most ~1 year more than you have
+# (experience score >= 75) or says nothing about years.
+STRETCH_MIN_SCORE = 60
+STRETCH_MIN_SKILLS = 50
+STRETCH_MIN_EXPERIENCE_SCORE = 75
+
 BUCKET_ORDER = {
     "apply_now": 0,
     "apply_with_research": 1,
@@ -50,6 +65,9 @@ class EligibilityEvaluator:
 
         if sponsored:
             positives.append("VISA_SPONSORSHIP_OFFERED")
+
+        if visa == "maybe":
+            positives.append("VISA_SPONSORSHIP_POSSIBLE")
 
         if job.work_authorization_required and not sponsored:
             blockers.append("WORK_AUTHORIZATION_REQUIRED")
@@ -136,9 +154,14 @@ class EligibilityEvaluator:
         elif blockers:
             status = "blocked"
         else:
+            # Only an explicit visa statement (or worldwide remote work)
+            # makes a job "likely". Relocation help alone is not visa
+            # help: a relocation bonus is often meant for people who
+            # already live in Germany.
             strong = sponsored or worldwide_remote
             medium = (
                 relocation == "yes"
+                or visa == "maybe"
                 or job.international_friendly
                 or job.english_working_language
                 or (
@@ -150,11 +173,7 @@ class EligibilityEvaluator:
             if strong:
                 status = "possible" if warnings else "likely"
             elif medium:
-                status = (
-                    "likely"
-                    if relocation == "yes" and not warnings
-                    else "possible"
-                )
+                status = "possible"
             elif requirement in ("required", "implied"):
                 status = "unlikely"
             else:
@@ -201,9 +220,17 @@ class ApplicationBucketer:
                 "read the listing before trusting the score."
             )
 
+        elif score < MIN_SCORE_TO_CONSIDER:
+            bucket = "skip"
+            reason = (
+                f"Weak technical match ({score:.0f}/100): the role or "
+                "skills are outside your profile."
+            )
+
         elif (
             status == "likely"
             and category == "good_target"
+            and score >= MIN_SCORE_FOR_APPLY_NOW
             and not (
                 job.experience_match_score is None
                 and job.seniority_match_score is None
@@ -215,8 +242,9 @@ class ApplicationBucketer:
         elif status == "likely" and category == "good_target":
             bucket = "apply_with_research"
             reason = (
-                "Good fit and positive eligibility, but both experience and "
-                "seniority are unknown; read the listing before applying."
+                "Positive eligibility, but either the match is only moderate "
+                "or experience and seniority are unknown; read the listing "
+                "before applying."
             )
 
         elif (
@@ -227,7 +255,7 @@ class ApplicationBucketer:
         ):
             bucket = "apply_with_research"
             reason = (
-                "Strong eligibility signals (visa/relocation) and a relevant "
+                "Strong eligibility signals (visa support) and a relevant "
                 "role; seniority is unclear, so read the listing."
             )
 
@@ -243,6 +271,23 @@ class ApplicationBucketer:
             reason = (
                 "Good technical fit; eligibility not confirmed, so check "
                 "visa and language details before applying."
+            )
+
+        elif (
+            status == "possible"
+            and category == "stretch_target"
+            and score >= STRETCH_MIN_SCORE
+            and (job.skills_match_score or 0) >= STRETCH_MIN_SKILLS
+            and (
+                job.experience_match_score is None
+                or job.experience_match_score >= STRETCH_MIN_EXPERIENCE_SCORE
+            )
+        ):
+            bucket = "apply_with_research"
+            reason = (
+                "Stretch: the title is above your level, but your skills fit "
+                "and the ad asks for little or no extra experience. Worth "
+                "applying; check visa and language details first."
             )
 
         elif status == "possible" and category == "stretch_target":

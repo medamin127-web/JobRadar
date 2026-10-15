@@ -6,6 +6,9 @@ The JobRadar pipeline as plain functions. Importing this file does nothing.
     jobs_to_frame() ->  DataFrame ready for the CSV
 """
 
+import random
+import time
+
 import pandas as pd
 
 from services import (
@@ -35,6 +38,8 @@ CONFIDENCE_RANK = {
 # Columns you read first; the rest follow in their natural order.
 FRONT_COLUMNS = [
     "application_bucket",
+    "is_new",
+    "age_days",
     "eligibility_status",
     "match_score",
     "ranking_score",
@@ -51,6 +56,9 @@ FRONT_COLUMNS = [
     "work_mode",
     "remote_scope",
     "job_url",
+    "status",
+    "status_note",
+    "id",
 ]
 
 
@@ -65,10 +73,40 @@ def order_columns(frame: pd.DataFrame) -> pd.DataFrame:
 # 1. COLLECT
 # ==================================================
 
-def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame:
-    """Run every search of every config and return all results together."""
+def collect_jobs(
+    source,
+    configs,
+    results_per_search,
+    hours_old,
+    delay=(0, 0),
+    rate_limit_wait=0,
+    stop_after_rate_limited=2,
+    sleep=time.sleep,
+) -> pd.DataFrame:
+    """
+    Run every search of every config and return all results together.
+
+    Between searches it pauses for a random number of seconds (delay).
+    A refused search (HTTP 429) is retried once after rate_limit_wait
+    seconds. After stop_after_rate_limited refused searches in a row it
+    stops and returns what it has.
+    """
 
     all_jobs = []
+    searches = 0
+    refused = []
+    refused_in_a_row = 0
+
+    def run(search_term, location):
+        return source.search(
+            search_term=search_term,
+            location=location,
+            results_wanted=results_per_search,
+            hours_old=hours_old,
+        )
+
+    def was_refused():
+        return getattr(source, "last_search_rate_limited", False)
 
     for config in configs:
 
@@ -80,19 +118,47 @@ def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame
 
         for search_term in config["search_terms"]:
 
+            if refused_in_a_row >= stop_after_rate_limited:
+                break
+
+            if searches:
+                sleep(random.uniform(*delay))
+
+            searches += 1
+
             print(f"\nSearching: {search_term} | {location}")
 
-            scraped = source.search(
-                search_term=search_term,
-                location=location,
-                results_wanted=results_per_search,
-                hours_old=hours_old,
-            )
+            scraped = run(search_term, location)
 
-            print(f"Found {len(scraped)} jobs")
+            if was_refused():
+                print(
+                    f"LinkedIn refused this search (HTTP 429). "
+                    f"Waiting {rate_limit_wait}s and retrying once..."
+                )
+                sleep(rate_limit_wait)
+                scraped = run(search_term, location)
+
+            if was_refused():
+                refused.append(f"{search_term} | {location}")
+                refused_in_a_row += 1
+                print("Still refused. Skipping this search.")
+            else:
+                refused_in_a_row = 0
+                print(f"Found {len(scraped)} jobs")
+
+                failures = getattr(source, "last_description_failures", 0)
+
+                if failures:
+                    print(
+                        f"  ({failures} job descriptions refused; "
+                        "earlier runs may still have them)"
+                    )
 
             if not scraped.empty:
                 all_jobs.append(scraped)
+
+        if refused_in_a_row >= stop_after_rate_limited:
+            break
 
     jobs = (
         pd.concat(all_jobs, ignore_index=True)
@@ -101,6 +167,19 @@ def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame
     )
 
     print(f"\nTotal jobs collected: {len(jobs)}")
+
+    if refused:
+        print(f"Searches refused by LinkedIn: {len(refused)}")
+
+        for item in refused:
+            print(f"  - {item}")
+
+        if refused_in_a_row >= stop_after_rate_limited:
+            print(
+                "Stopped early: LinkedIn keeps refusing requests. "
+                "Wait a few hours before scraping again, or use "
+                "'python scraper.py --offline' to work with saved data."
+            )
 
     return jobs
 
@@ -205,12 +284,20 @@ def score_jobs(job_objects, profile) -> None:
 # 5. SORT
 # ==================================================
 
+# Inside a bucket, explicit visa support outranks a higher score.
+VISA_RANK = {
+    "yes": 0,
+    "maybe": 1,
+}
+
+
 def sort_jobs(job_objects) -> None:
-    """Bucket first, then score (penalized for missing data)."""
+    """Bucket first, then visa evidence, then score (penalized for missing data)."""
 
     job_objects.sort(
         key=lambda job: (
             BUCKET_ORDER.get(job.application_bucket, 9),
+            VISA_RANK.get(job.visa_sponsorship_status, 2),
             -(job.ranking_score if job.ranking_score is not None else 0),
             -CONFIDENCE_RANK.get(job.confidence, 0),
         )
@@ -235,6 +322,47 @@ def process_jobs(jobs: pd.DataFrame, profile) -> list:
     sort_jobs(job_objects)
 
     return job_objects
+
+
+# ==================================================
+# 7. TRACKING (database status, new / old)
+# ==================================================
+
+def attach_tracking(job_objects, info: dict, new_ids=()) -> None:
+    """Copy first_seen / age / your status from the database onto each job."""
+
+    new_ids = set(new_ids)
+
+    for job in job_objects:
+        details = info.get(job.id, {})
+
+        job.is_new = job.id in new_ids
+        job.first_seen = details.get("first_seen")
+        job.age_days = details.get("age_days")
+        job.status = details.get("status") or "open"
+        job.status_note = details.get("status_note")
+
+
+def split_by_status(job_objects):
+    """
+    -> (to_rank, applied, hidden)
+
+    to_rank: jobs you have not acted on yet (the ranking)
+    applied: jobs you applied to (listed separately)
+    hidden:  not_interested / closed (left out)
+    """
+
+    to_rank, applied, hidden = [], [], []
+
+    for job in job_objects:
+        if job.status == "applied":
+            applied.append(job)
+        elif job.status in ("not_interested", "closed"):
+            hidden.append(job)
+        else:
+            to_rank.append(job)
+
+    return to_rank, applied, hidden
 
 
 def jobs_to_frame(job_objects) -> pd.DataFrame:

@@ -1,4 +1,3 @@
-
 import re
 
 from models import Job
@@ -61,6 +60,16 @@ class ExperienceAnalyzer:
         # French: 3-5 ans d'expérience
         rf"\b{NUMBER}\s*[-–—]\s*{NUMBER_2}\s*ans?\s+d['’]expérience\b",
         rf"\b{NUMBER}\s+à\s+{NUMBER_2}\s*ans?\s+d['’]expérience\b",
+    ]
+
+    # Maximum experience ("no more than 12 months of experience"), used by
+    # graduate programmes. Checked before the minimum patterns, which would
+    # otherwise read "no more than 2 years of experience" as "2+ years".
+    EXPERIENCE_CAP_PATTERNS = [
+        rf"\b(?:no more than|not more than|at most|a maximum of|maximum of"
+        rf"|less than|fewer than|höchstens|maximal|weniger als)\s+{NUMBER}\s*"
+        rf"(months?|monate?n?|years?|jahre?n?)\b[^.!?;]{{0,80}}"
+        rf"\b(?:experience|erfahrung|berufserfahrung)\b",
     ]
 
     EXPERIENCE_PATTERNS = [
@@ -128,6 +137,19 @@ class ExperienceAnalyzer:
                 ):
                     return minimum, maximum
 
+        # Then a maximum ("no more than 12 months of experience").
+        for pattern in self.EXPERIENCE_CAP_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+
+            if match:
+                amount = self._to_number(match.group(1))
+
+                if amount is not None:
+                    if match.group(2).startswith(("month", "monat")):
+                        amount = round(amount / 12, 2)
+
+                    return None, amount
+
         # Then check single minimum requirements.
         for pattern in self.EXPERIENCE_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -188,6 +210,7 @@ class ExperienceAnalyzer:
 
         for pattern in (
             self.EXPERIENCE_RANGE_PATTERNS
+            + self.EXPERIENCE_CAP_PATTERNS
             + self.EXPERIENCE_PATTERNS
         ):
             for match in re.finditer(pattern, text, re.IGNORECASE):

@@ -69,6 +69,7 @@ def print_ranking(job_objects) -> None:
 
         print(
             f"{index:2}. "
+            f"{'NEW' if job.is_new else '   '} "
             f"{job.match_score if job.match_score is not None else 0:5.1f}/100 | "
             f"{job.application_bucket or 'unknown':19} | "
             f"Elig: {job.eligibility_status or 'unknown':8} | "
@@ -77,7 +78,35 @@ def print_ranking(job_objects) -> None:
             f"{job.title} | "
             f"{job.company} | "
             f"{job.location}"
+            f"{_age_text(job)}"
+            f" | id {short_id(job.id)}"
         )
+
+
+def short_id(job_id) -> str:
+    """'li-4460378155' -> '4460378155' (what you type in track.py)."""
+    text = str(job_id or "")
+    return text[3:] if text.startswith("li-") else text
+
+
+def _age_text(job) -> str:
+    if job.age_days is None:
+        return ""
+
+    return " | today" if job.age_days <= 0 else f" | {job.age_days}d old"
+
+
+def print_applications(applied) -> None:
+    if not applied:
+        return
+
+    print("\n" + "=" * 100)
+    print(f"YOUR APPLICATIONS ({len(applied)})")
+    print("=" * 100)
+
+    for job in applied:
+        note = f" | {job.status_note}" if job.status_note else ""
+        print(f"  - {job.title} | {job.company} | id {short_id(job.id)}{note}")
 
 
 def _experience_text(job) -> str:
@@ -108,8 +137,9 @@ def print_details(job_objects) -> None:
 
     for job in job_objects:
 
-        print(f"\n{job.title}")
+        print(f"\n{job.title}{'   [NEW]' if job.is_new else ''}")
         print(f"Company: {job.company}")
+        print(f"Id: {short_id(job.id)}   Posted/first seen: {job.age_days} days ago   Status: {job.status}")
         print(f"Location: {job.location}")
         print(f"Match Score: {job.match_score}/100")
         print(f"Confidence: {job.confidence}")
@@ -155,9 +185,12 @@ def print_details(job_objects) -> None:
         print(f"  Job language: {job.job_language} | Work mode: {job.work_mode} | Remote scope: {job.remote_scope}")
 
 
-def print_summary(job_objects, frame: pd.DataFrame, saved_path) -> None:
+def print_summary(job_objects, frame: pd.DataFrame, saved_path, tracking: dict = None) -> None:
 
     print(f"\nSaved {len(job_objects)} unique jobs to {saved_path}")
+
+    for label, value in (tracking or {}).items():
+        print(f"{label}: {value}")
     print(f"Columns: {len(frame.columns)}")
     print(f"Job objects created: {len(job_objects)}")
 

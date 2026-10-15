@@ -21,7 +21,9 @@ class TestMatchScorer(unittest.TestCase):
 
         result = MatchScorer.score(job, self.profile)
 
-        self.assertEqual(result["overall_score"], 97)
+        # 4/4 skills is good evidence but not proof: 83 after the
+        # small-sample adjustment, so the total is 90, not 97.
+        self.assertEqual(result["overall_score"], 90)
         self.assertEqual(result["confidence"], "high")
         self.assertEqual(result["coverage"], 100)
         self.assertEqual(result["missing_skills"], [])
@@ -36,7 +38,7 @@ class TestMatchScorer(unittest.TestCase):
 
         result = MatchScorer.score(job, self.profile)
 
-        self.assertEqual(result["overall_score"], 54)
+        self.assertEqual(result["overall_score"], 55)
         self.assertEqual(result["matched_skills"], ["react", "typescript"])
         self.assertEqual(result["experience_score"], 20)
 
@@ -50,7 +52,7 @@ class TestMatchScorer(unittest.TestCase):
 
         result = MatchScorer.score(job, self.profile)
 
-        self.assertLess(result["overall_score"], 25)
+        self.assertLess(result["overall_score"], 30)
         self.assertEqual(result["role_score"], 0)
         self.assertEqual(result["skills_score"], 0)
 

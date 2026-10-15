@@ -46,6 +46,20 @@ RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72
 
 # ==================================================
+# BEING GENTLE WITH LINKEDIN (HTTP 429 = "too many requests")
+# ==================================================
+
+# Random pause between two searches, in seconds.
+DELAY_BETWEEN_SEARCHES = (6, 15)
+
+# When a search is refused: wait this long, then retry it once.
+RATE_LIMIT_WAIT_SECONDS = 90
+
+# Stop scraping after this many refused searches in a row and process
+# what was collected. Scraping again usually works after a few hours.
+STOP_AFTER_RATE_LIMITED = 2
+
+# ==================================================
 # FOLDERS (all of data/ and reports/ are git-ignored)
 # ==================================================
 
@@ -53,3 +67,12 @@ RAW_DIR = "data/raw"          # raw scrape of every run (description cache)
 OUTPUT_DIR = "data/output"    # jobs.csv
 REPORTS_DIR = "reports"       # full text report of every run (UTF-8)
 OUTPUT_FILE = "jobs.csv"
+DB_PATH = "data/jobradar.db"  # every job ever seen + your status for it
+
+# ==================================================
+# WHICH SAVED JOBS ARE SHOWN
+# ==================================================
+
+# Jobs posted longer ago than this are probably filled or closed: they stay
+# in the database but are left out of the ranking.
+MAX_JOB_AGE_DAYS = 30

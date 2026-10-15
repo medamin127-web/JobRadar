@@ -1,4 +1,3 @@
-
 from models import Job, Profile
 
 from .seniority_matcher import SeniorityMatcher
@@ -42,6 +41,7 @@ class TargetClassifier:
             }
             
         required_min = job.experience_min_years
+        required_max = getattr(job, "experience_max_years", None)
 
         job_level = SeniorityMatcher._normalize_level(job.seniority)
         candidate_level = seniority_result.get("candidate_seniority")
@@ -69,7 +69,25 @@ class TargetClassifier:
         reason = None
 
         # 1. Explicit experience requirements take precedence.
-        if candidate_years is not None and required_min is not None:
+
+        # A maximum alone is a cap (graduate programmes): above it,
+        # the job is not open to you.
+        if (
+            required_min is None
+            and required_max is not None
+            and candidate_years > required_max
+        ):
+            category = "low_priority"
+            reason = (
+                f"The job accepts at most {required_max:g} years of "
+                f"experience; you have {candidate_years:g}."
+            )
+
+        if (
+            category is None
+            and candidate_years is not None
+            and required_min is not None
+        ):
             gap = required_min - candidate_years
 
             if gap >= 3:
@@ -141,6 +159,18 @@ class TargetClassifier:
                         "and the available technical evidence is not "
                         "strong enough for a confident classification."
                     )
+
+            elif (
+                technical_alignment is not None
+                and technical_alignment < 50
+            ):
+                # Level fits, but the job is in another field
+                # (e.g. a junior iOS role for a web developer).
+                category = "needs_review"
+                reason = (
+                    "Your level fits, but the role and skills overlap "
+                    "with your profile is weak."
+                )
 
             else:
                 category = "good_target"

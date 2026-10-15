@@ -119,8 +119,17 @@ def detect_language(text: Optional[str]) -> Optional[str]:
 # GERMAN LANGUAGE REQUIREMENT
 # ==================================================
 
+# "German law", "German company", "German clients" describe the country,
+# not the language, so they are not counted as a language mention.
+_GERMAN_NOT_LANGUAGE = (
+    r"(?!\s+(?:law|laws|legislation|regulations?|citizen\w*|nationals?"
+    r"|nationality|authorit\w+|government|federal|tax|labou?r|market"
+    r"|compan\w+|start-?ups?|security|engineering|mittelstand))"
+)
+
 GERMAN_TERM = re.compile(
-    r"\bgerman\b|\bdeutsch(?:e|en|er|es|em)?\b|deutschkenntnisse"
+    r"\bgerman\b" + _GERMAN_NOT_LANGUAGE +
+    r"|\bdeutsch(?:e|en|er|es|em)?\b|deutschkenntnisse"
     r"|deutschsprach\w*|sprachkenntnisse in deutsch",
     re.IGNORECASE,
 )
@@ -192,6 +201,7 @@ SHARED_FILLER = {
     "and", "und", "or", "oder", "both", "beide", "sowie", "auf", "in",
     "at", "skills", "kenntnisse", "kenntnissen", "level", "niveau",
     "sprachkenntnisse", "language", "sprache", "sprachen", "der", "die", "of",
+    "mind", "mindestens", "min", "minimum", "least",
 }
 
 OTHER_LANGUAGE = re.compile(
@@ -310,11 +320,13 @@ def analyze_german_requirement(text: str, language: Optional[str]) -> dict:
             not_required_hit = not_required_hit or window
             continue
 
-        if not REQUIREMENT_CUES.search(window):
-            continue
-
+        # Checked before the requirement words: "German is a plus" on its
+        # own line contains no requirement word but is clearly optional.
         if OPTIONAL_CUES.search(window):
             optional_hit = optional_hit or window
+            continue
+
+        if not REQUIREMENT_CUES.search(window):
             continue
 
         level = _nearest_level(
@@ -372,7 +384,8 @@ VISA_TOPIC = re.compile(
     r"|arbeitserlaubnis|arbeitsgenehmigung|work authori[sz]ation"
     r"|authori[sz]ed to work|right to work|(?:legally )?(?:allowed|permitted|entitled|eligible) to work"
     r"|blue card|blaue karte|\bsponsor\w*|\beu[- ]?(?:citizen|national|b(?:ü|u)rger|staatsb)"
-    r"|staatsangeh\w+|arbeitsberechtigung",
+    r"|staatsangeh\w+|arbeitsberechtigung"
+    r"|berechtigung zur beschäftigung|beschäftigungserlaubnis",
     re.IGNORECASE,
 )
 
@@ -384,7 +397,21 @@ NEGATIVE_VISA = compile_all([
     r"without (?:the need for )?(?:visa )?sponsorship",
     r"keine?n?\s+(?:\w+\s+){0,3}(?:visum|visa|sponsoring|aufenthaltstitel)",
     r"nicht\s+(?:\w+\s+){0,4}(?:sponsern|visum|visa)",
+    # "ein Visa- oder Relocation-Sponsoring können wir ... nicht anbieten"
+    r"(?:visa|visum|sponsoring)[^.;\n]{0,80}?\b(?:nicht|keine?n?)\b[^.;\n]{0,40}?"
+    r"\b(?:anbieten|bieten|übernehmen|unterstützen|sponsern|leisten|möglich)",
 ])
+
+# Conditional statements: not a promise, not a refusal.
+# "Visa sponsorship may be considered for exceptional candidates"
+SOFT_SPONSOR = re.compile(
+    r"(?:visa|work permit|blue card)s?\W+(?:\w+\W+){0,2}sponsor\w*\W+(?:\w+\W+){0,3}"
+    r"(?:may|might|could)\W+(?:\w+\W+){0,2}(?:considered|discussed|possible|available|offered)"
+    r"|(?:may|might|could)\W+(?:\w+\W+){0,3}(?:consider|offer|provide|support|sponsor)\w*\W+"
+    r"(?:\w+\W+){0,3}(?:visa|work permit|blue card)"
+    r"|(?:visa|sponsorship)\W+(?:\w+\W+){0,4}case[- ]by[- ]case",
+    re.IGNORECASE,
+)
 
 POSITIVE_VERBS = re.compile(
     r"\b(?:offer\w*|provid\w+|available|possible|included|includ\w+"
@@ -415,6 +442,7 @@ _AUTH_WORDS = (
     "work permit|work visa|residence permit|right to work|work authori[sz]ation"
     "|arbeitserlaubnis|arbeitsgenehmigung|aufenthaltstitel"
     "|aufenthaltsgenehmigung|arbeitsberechtigung"
+    "|berechtigung zur beschäftigung|beschäftigungserlaubnis"
 )
 
 _ALLOWED_TO_WORK = (
@@ -462,6 +490,8 @@ RELOCATION_POSITIVE = compile_all([
 
 RELOCATION_NEGATIVE = compile_all([
     r"no relocation",
+    r"(?:not|n't|unable to|cannot)\s+(?:\w+\s+){0,4}(?:support|offer|provide|cover|assist|help)\w*"
+    r"\W+(?:\w+\W+){0,6}relocat\w+",
     r"relocation (?:is )?not (?:offered|available|provided|possible)",
     r"keine?\w*\s+(?:\w+\s+){0,2}(?:relocation|umzug\w*)",
     r"without relocation",
@@ -470,12 +500,13 @@ RELOCATION_NEGATIVE = compile_all([
 
 def analyze_visa(text: str) -> dict:
     """
-    Returns visa_status (yes | no | mixed | unknown),
+    Returns visa_status (yes | maybe | no | mixed | unknown),
     visa_evidence, work_authorization_required, work_authorization_evidence.
     """
 
     positive_hit = None
     negative_hit = None
+    soft_hit = None
     auth_hit = None
 
     for sentence in split_sentences(text):
@@ -488,6 +519,12 @@ def analyze_visa(text: str) -> dict:
 
         if negative:
             negative_hit = negative_hit or sentence
+            continue
+
+        # Checked before the positive rules: "sponsorship may be
+        # available" contains "available" but promises nothing.
+        if SOFT_SPONSOR.search(sentence):
+            soft_hit = soft_hit or sentence
             continue
 
         positive = (
@@ -508,6 +545,8 @@ def analyze_visa(text: str) -> dict:
         status, evidence = "no", snippet(negative_hit)
     elif positive_hit:
         status, evidence = "yes", snippet(positive_hit)
+    elif soft_hit:
+        status, evidence = "maybe", snippet(soft_hit)
     else:
         status, evidence = "unknown", "No clear visa statement detected."
 
@@ -759,6 +798,12 @@ class EligibilityAnalyzer:
         visa = analyze_visa(text)
         relocation = analyze_relocation(text)
         remote = analyze_remote(job, text)
+
+        # A company that refuses relocation will not bring someone over
+        # from outside the EU either (your label on Wolt's ad).
+        if visa["visa_status"] == "unknown" and relocation["relocation_support"] == "no":
+            visa["visa_status"] = "no"
+            visa["visa_evidence"] = relocation["relocation_evidence"]
 
         return {
             "job_language": language,
