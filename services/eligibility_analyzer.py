@@ -124,7 +124,8 @@ def detect_language(text: Optional[str]) -> Optional[str]:
 _GERMAN_NOT_LANGUAGE = (
     r"(?!\s+(?:law|laws|legislation|regulations?|citizen\w*|nationals?"
     r"|nationality|authorit\w+|government|federal|tax|labou?r|market"
-    r"|compan\w+|start-?ups?|security|engineering|mittelstand))"
+    r"|compan\w+|start-?ups?|security|engineering|mittelstand"
+    r"|entit(?:y|ies)|offices?|subsidiar\w+|branch\w*))"
 )
 
 GERMAN_TERM = re.compile(
@@ -158,7 +159,7 @@ NOT_REQUIRED_CUES = re.compile(
 OPTIONAL_CUES = re.compile(
     r"\bplus\b|nice[- ]to[- ]have|advantage|beneficial|bonus|desirable"
     r"|preferred|wünschenswert|von vorteil|vorteilhaft|idealerweise"
-    r"|ideally|willingness to learn|bereitschaft"
+    r"|ideally|willingness to learn|bereitschaft|zu lernen|to learn"
     r"|english or german|german or english|englisch oder\W+(?:und\W+)?deutsch"
     r"|deutsch oder\W+(?:und\W+)?englisch",
     re.IGNORECASE,
@@ -295,6 +296,28 @@ def _window(sentence: str, match: re.Match, size: int = 70):
     return chunk, start
 
 
+# Hints that only make German optional when no level is attached to it.
+WEAK_OPTIONAL = re.compile(r"willingness to learn|bereitschaft|zu lernen|to learn", re.IGNORECASE)
+
+_CLAUSE_BREAK = re.compile(r"[,;()\[\]]|\bsowie\b|\bas well as\b", re.IGNORECASE)
+
+
+def _clause(sentence: str, match: re.Match) -> str:
+    """The part of the sentence around the match, between commas, brackets,
+    semicolons, 'sowie' or 'as well as'."""
+
+    start, end = 0, len(sentence)
+
+    for brk in _CLAUSE_BREAK.finditer(sentence):
+        if brk.end() <= match.start():
+            start = brk.end()
+        elif brk.start() >= match.end():
+            end = brk.start()
+            break
+
+    return sentence[start:end]
+
+
 def analyze_german_requirement(text: str, language: Optional[str]) -> dict:
     """
     Returns:
@@ -320,11 +343,26 @@ def analyze_german_requirement(text: str, language: Optional[str]) -> dict:
             not_required_hit = not_required_hit or window
             continue
 
-        # Checked before the requirement words: "German is a plus" on its
-        # own line contains no requirement word but is clearly optional.
-        if OPTIONAL_CUES.search(window):
-            optional_hit = optional_hit or window
-            continue
+        # Optional words count only in the same clause as the German term:
+        #   "Excellent English skills, German is a plus"          -> optional
+        #   "verhandlungssicheres Englisch und idealerweise Deutsch" -> optional
+        #   "Sehr gute Deutsch- und Englischkenntnisse sowie
+        #    idealerweise Erfahrung ..."  ("ideally" = experience) -> required
+        clause = _clause(sentence, german)
+        cues = [m.group(0) for m in OPTIONAL_CUES.finditer(clause)]
+
+        if cues:
+            strong = any(not WEAK_OPTIONAL.search(cue) for cue in cues)
+            clause_start = sentence.find(clause)
+            level_in_clause = _nearest_level(
+                clause, german.start() - clause_start, german.end() - clause_start
+            )
+
+            # "Bereitschaft ... und verhandlungssichere Deutschkenntnisse":
+            # a weak hint loses against a level attached to German.
+            if strong or level_in_clause is None:
+                optional_hit = optional_hit or window
+                continue
 
         if not REQUIREMENT_CUES.search(window):
             continue

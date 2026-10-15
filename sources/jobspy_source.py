@@ -42,9 +42,14 @@ def _jobspy_loggers():
 
 
 class JobSpySource(JobSource):
+    """
+    LinkedIn, Indeed, Glassdoor... through JobSpy. Use one source per site,
+    so a site that refuses requests can be paused without stopping the others.
+    """
 
     def __init__(self, sites=None):
         self.sites = sites or ["linkedin"]
+        self.name = "+".join(self.sites)
 
         # Filled after every search().
         self.last_search_rate_limited = False
@@ -56,6 +61,7 @@ class JobSpySource(JobSource):
         location: str,
         results_wanted: int,
         hours_old: int,
+        country: str = None,
     ) -> pd.DataFrame:
 
         watcher = _RateLimitWatcher()
@@ -63,6 +69,12 @@ class JobSpySource(JobSource):
 
         for logger in loggers:
             logger.addHandler(watcher)
+
+        extra = {}
+
+        if country:
+            # Indeed and Glassdoor need the country name ("germany").
+            extra["country_indeed"] = country
 
         try:
             jobs = scrape_jobs(
@@ -72,6 +84,7 @@ class JobSpySource(JobSource):
                 results_wanted=results_wanted,
                 hours_old=hours_old,
                 linkedin_fetch_description=True,
+                **extra,
             )
         finally:
             for logger in loggers:

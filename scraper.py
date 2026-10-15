@@ -20,10 +20,15 @@ happens inside main().
 import argparse
 
 from config import (
+    ARBEITNOW_PAGES,
     DB_PATH,
+    GREENHOUSE_BOARDS,
+    LEVER_COMPANIES,
     DELAY_BETWEEN_SEARCHES,
     HOURS_OLD,
     MAX_JOB_AGE_DAYS,
+    REPORT_DETAIL_BUCKETS,
+    REPORT_HIDE_BUCKETS,
     RATE_LIMIT_WAIT_SECONDS,
     REPORTS_DIR,
     RESULTS_PER_SEARCH,
@@ -32,8 +37,11 @@ from config import (
     STOP_AFTER_RATE_LIMITED,
 )
 from database import JobStore
+import pandas as pd
+
 from pipeline import (
     attach_tracking,
+    collect_feeds,
     collect_jobs,
     jobs_to_frame,
     process_jobs,
@@ -46,6 +54,7 @@ from reporting import (
     print_summary,
     report_to_file,
 )
+from sources.relevance import in_target_countries
 from storage import (
     fill_missing_descriptions,
     load_raw,
@@ -68,12 +77,26 @@ def load_profile():
     return PROFILE
 
 
-def build_source():
+def build_source(site):
     # Imported here so the rest of the project (and the tests) work
     # even when JobSpy is not installed.
     from sources import JobSpySource
 
-    return JobSpySource(sites=SITES)
+    return JobSpySource(sites=[site])
+
+
+def build_feeds():
+    from sources import ArbeitnowSource, GreenhouseSource, LeverSource
+
+    feeds = []
+
+    if ARBEITNOW_PAGES:
+        feeds.append(ArbeitnowSource(max_pages=ARBEITNOW_PAGES))
+
+    feeds += [GreenhouseSource(board) for board in GREENHOUSE_BOARDS]
+    feeds += [LeverSource(company) for company in LEVER_COMPANIES]
+
+    return feeds
 
 
 def parse_args(argv=None):
@@ -97,15 +120,38 @@ def parse_args(argv=None):
 
 
 def scrape():
-    raw = collect_jobs(
-        build_source(),
-        SEARCH_CONFIGS,
-        RESULTS_PER_SEARCH,
-        HOURS_OLD,
-        delay=DELAY_BETWEEN_SEARCHES,
-        rate_limit_wait=RATE_LIMIT_WAIT_SECONDS,
-        stop_after_rate_limited=STOP_AFTER_RATE_LIMITED,
-    )
+    frames = []
+
+    # 1. Search sites (LinkedIn, Indeed...), one after the other, so a site
+    #    that refuses requests does not stop the others.
+    for site in SITES:
+        print("\n" + "#" * 60)
+        print(f"SITE: {site}")
+        print("#" * 60)
+
+        frames.append(collect_jobs(
+            build_source(site),
+            SEARCH_CONFIGS,
+            RESULTS_PER_SEARCH,
+            HOURS_OLD,
+            delay=DELAY_BETWEEN_SEARCHES,
+            rate_limit_wait=RATE_LIMIT_WAIT_SECONDS,
+            stop_after_rate_limited=STOP_AFTER_RATE_LIMITED,
+        ))
+
+    # 2. Feeds (Arbeitnow, company career pages).
+    feeds = build_feeds()
+
+    if feeds:
+        print("\n" + "#" * 60)
+        print("FEEDS")
+        print("#" * 60)
+        frames.append(collect_feeds(feeds, SEARCH_CONFIGS))
+
+    frames = [frame for frame in frames if not frame.empty]
+    raw = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+    print(f"\nCollected from all sources: {len(raw)}")
 
     save_raw(raw)
 
@@ -150,10 +196,15 @@ def collect(args, store):
         print(f"New jobs (never seen before): {len(new_ids)}")
 
     raw = store.load(max_age_days=MAX_JOB_AGE_DAYS)
+    recent = len(raw)
+
+    if not raw.empty:
+        raw = raw[in_target_countries(raw, SEARCH_CONFIGS)].reset_index(drop=True)
 
     print(
         f"Jobs in the database: {store.count()}, "
-        f"posted in the last {MAX_JOB_AGE_DAYS} days: {len(raw)}"
+        f"posted in the last {MAX_JOB_AGE_DAYS} days: {recent}, "
+        f"in your countries: {len(raw)}"
     )
 
     return raw, new_ids
@@ -184,10 +235,17 @@ def main(argv=None) -> None:
             saved_path = save_csv_safely(frame)
             print(f"\nSaved results to {saved_path}")
 
-        # 5. Report
-        print_ranking(to_rank)
+        # 5. Report (the CSV above always has every job)
+        listed = [j for j in to_rank if j.application_bucket not in REPORT_HIDE_BUCKETS]
+        detailed = [j for j in to_rank if j.application_bucket in REPORT_DETAIL_BUCKETS]
+
+        print_ranking(listed)
+
+        if len(listed) < len(to_rank):
+            print(f"\n({len(to_rank) - len(listed)} skipped jobs not listed: see {saved_path})")
+
         print_applications(applied)
-        print_details(to_rank)
+        print_details(detailed)
         print_summary(to_rank, jobs_to_frame(to_rank), saved_path, {
             "New in this run": sum(1 for job in to_rank if job.is_new),
             "Applied (listed separately)": len(applied),

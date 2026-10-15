@@ -75,6 +75,7 @@ class Job:
     # -------------------------------
 
     search_term: Optional[str] = None
+    found_on: Optional[str] = None       # every site the job was seen on
 
 
     match_score: Optional[float] = None

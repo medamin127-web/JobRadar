@@ -11,6 +11,7 @@ class JobSource(ABC):
         location: str,
         results_wanted: int,
         hours_old: int,
+        country: str = None,
     ) -> pd.DataFrame:
         """
         Search for jobs and return them as a pandas DataFrame.

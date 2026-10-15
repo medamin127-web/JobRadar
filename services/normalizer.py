@@ -38,6 +38,7 @@ class JobNormalizer:
         "company_url",
         "company_description",
         "search_term",
+        "found_on",
     ]
 
     def normalize_dataframe(
@@ -164,6 +165,10 @@ class JobNormalizer:
 
             search_term=self.clean_text(
                 row["search_term"]
+            ),
+
+            found_on=self.clean_text(
+                row["found_on"]
             ),
         )
         

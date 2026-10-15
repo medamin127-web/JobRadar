@@ -77,7 +77,7 @@ class TestCollect(unittest.TestCase):
         jobs, _, output = collect(source, "a", "b", "c")
 
         self.assertEqual(sorted(jobs["id"]), ["a", "c"])
-        self.assertIn("Searches refused by LinkedIn: 1", output)
+        self.assertIn("Searches refused: 1", output)
 
     def test_stops_after_too_many_refusals_in_a_row(self):
         source = FakeSource(refuse=["b", "b", "c", "c"])

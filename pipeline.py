@@ -7,6 +7,7 @@ The JobRadar pipeline as plain functions. Importing this file does nothing.
 """
 
 import random
+import re
 import time
 
 import pandas as pd
@@ -26,6 +27,7 @@ from services.experience_matcher import ExperienceMatcher
 from services.match_scorer import MatchScorer
 from services.seniority_matcher import SeniorityMatcher
 from services.target_classifier import TargetClassifier
+from sources.relevance import in_target_countries, is_tech_title
 
 
 CONFIDENCE_RANK = {
@@ -73,6 +75,40 @@ def order_columns(frame: pd.DataFrame) -> pd.DataFrame:
 # 1. COLLECT
 # ==================================================
 
+def collect_feeds(feeds, configs) -> pd.DataFrame:
+    """
+    Read every feed source (Arbeitnow, company career pages) and keep the
+    tech jobs. Jobs from all countries are kept (stored for when you add
+    countries); the ranking only shows your countries (in_target_countries).
+    """
+
+    frames = []
+
+    for feed in feeds:
+        print(f"\nReading feed: {feed.name}")
+
+        try:
+            jobs = feed.fetch()
+        except Exception as error:
+            print(f"  Skipped ({error})")
+            continue
+
+        total = len(jobs)
+
+        if not jobs.empty:
+            jobs = jobs[jobs["title"].map(is_tech_title)]
+            in_yours = in_target_countries(jobs, configs).sum() if not jobs.empty else 0
+        else:
+            in_yours = 0
+
+        print(f"  {total} jobs, {len(jobs)} tech roles kept, {in_yours} of them in your countries")
+
+        if not jobs.empty:
+            frames.append(jobs)
+
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
 def collect_jobs(
     source,
     configs,
@@ -97,12 +133,15 @@ def collect_jobs(
     refused = []
     refused_in_a_row = 0
 
-    def run(search_term, location):
+    def run(search_term, location, country=None):
+        extra = {"country": country} if country else {}
+
         return source.search(
             search_term=search_term,
             location=location,
             results_wanted=results_per_search,
             hours_old=hours_old,
+            **extra,
         )
 
     def was_refused():
@@ -126,17 +165,19 @@ def collect_jobs(
 
             searches += 1
 
-            print(f"\nSearching: {search_term} | {location}")
+            site = getattr(source, "name", "")
+            print(f"\nSearching{' ' + site if site else ''}: {search_term} | {location}")
 
-            scraped = run(search_term, location)
+            country = config.get("indeed_country")
+            scraped = run(search_term, location, country)
 
             if was_refused():
                 print(
-                    f"LinkedIn refused this search (HTTP 429). "
+                    f"The site refused this search (HTTP 429). "
                     f"Waiting {rate_limit_wait}s and retrying once..."
                 )
                 sleep(rate_limit_wait)
-                scraped = run(search_term, location)
+                scraped = run(search_term, location, country)
 
             if was_refused():
                 refused.append(f"{search_term} | {location}")
@@ -169,14 +210,14 @@ def collect_jobs(
     print(f"\nTotal jobs collected: {len(jobs)}")
 
     if refused:
-        print(f"Searches refused by LinkedIn: {len(refused)}")
+        print(f"Searches refused: {len(refused)}")
 
         for item in refused:
             print(f"  - {item}")
 
         if refused_in_a_row >= stop_after_rate_limited:
             print(
-                "Stopped early: LinkedIn keeps refusing requests. "
+                "Stopped early: the site keeps refusing requests. "
                 "Wait a few hours before scraping again, or use "
                 "'python scraper.py --offline' to work with saved data."
             )
@@ -211,9 +252,82 @@ def deduplicate(jobs: pd.DataFrame) -> pd.DataFrame:
 
         jobs = jobs[~duplicate_key.duplicated()].reset_index(drop=True)
 
+    jobs = merge_across_sites(jobs)
+
     print(f"Unique jobs after deduplication: {len(jobs)}")
 
     return jobs
+
+
+# Gender tags and noise that differ between sites for the same job.
+_TITLE_NOISE = re.compile(
+    r"\((?:[mwfdx]\s*/\s*){1,3}[mwfdx]\)|\b(?:[mwfdx]/){2}[mwfdx]\b"
+    r"|\(all genders?\)|\(all identities\)|\(gn\)|\*",
+    re.IGNORECASE,
+)
+_COMPANY_NOISE = re.compile(
+    r"\b(?:gmbh|ag|se|kg|inc|ltd|llc|co|group|germany|deutschland)\b",
+    re.IGNORECASE,
+)
+
+
+def _simple(text, noise) -> str:
+    import unicodedata
+
+    text = str(text or "").lower().replace("ß", "ss")
+    # "für" and "fur" (umlaut lost on one site) must compare equal.
+    text = "".join(
+        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
+    )
+    text = noise.sub(" ", text)
+    return " ".join(re.sub(r"[^\w]+", " ", text).split())
+
+
+def merge_across_sites(jobs: pd.DataFrame) -> pd.DataFrame:
+    """
+    One job posted on several sites (LinkedIn + Indeed + a career page)
+    becomes one row: same company, same title (ignoring "(m/w/d)" etc.)
+    and same city. The row with the longest description is kept, and
+    `found_on` lists every site it was seen on.
+    """
+
+    if jobs.empty or not {"title", "company"} <= set(jobs.columns):
+        return jobs
+
+    jobs = jobs.copy()
+    sites = jobs["site"] if "site" in jobs.columns else pd.Series([""] * len(jobs))
+    # First word of the city: "Frankfurt" == "Frankfurt am Main".
+    city = (
+        jobs["location"].fillna("").astype(str).str.split(",").str[0]
+        .map(lambda c: (_simple(c, _COMPANY_NOISE).split() or [""])[0])
+        if "location" in jobs.columns else ""
+    )
+
+    # "(SGN)", "(Germany)" etc. after a company name are ignored.
+    key = (
+        jobs["company"].map(lambda c: _simple(re.sub(r"\(.*?\)", " ", str(c or "")), _COMPANY_NOISE))
+        + "|" + jobs["title"].map(lambda t: _simple(t, _TITLE_NOISE))
+        + "|" + city
+    )
+
+    length = (
+        jobs["description"].fillna("").astype(str).str.len()
+        if "description" in jobs.columns else 0
+    )
+
+    jobs["_key"] = key
+    jobs["_length"] = length
+    jobs["_site"] = sites.fillna("").astype(str)
+
+    found_on = jobs.groupby("_key")["_site"].agg(
+        lambda values: ", ".join(sorted({v for v in values if v}))
+    )
+
+    best = jobs.sort_values("_length", ascending=False).drop_duplicates("_key")
+    best = best.sort_index()
+    best["found_on"] = best["_key"].map(found_on)
+
+    return best.drop(columns=["_key", "_length", "_site"]).reset_index(drop=True)
 
 
 # ==================================================

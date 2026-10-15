@@ -11,6 +11,20 @@ Edit this file to change searches. Nothing here runs anything.
 SEARCH_CONFIGS = [
     {
         "location": "Germany",
+
+        # Country name Indeed/Glassdoor expect.
+        "indeed_country": "germany",
+
+        # A feed job (Arbeitnow, company career pages) is kept only when its
+        # location contains one of these words.
+        "location_keywords": [
+            "germany", "deutschland", "berlin", "munich", "münchen", "hamburg",
+            "cologne", "köln", "frankfurt", "düsseldorf", "dusseldorf",
+            "stuttgart", "leipzig", "dresden", "hannover", "hanover",
+            "nuremberg", "nürnberg", "bremen", "essen", "dortmund", "bonn",
+            "karlsruhe", "mannheim", "heidelberg", "potsdam", "aachen",
+        ],
+
         "search_terms": [
             "Full Stack Developer",
             "Full Stack Engineer",
@@ -39,8 +53,23 @@ SEARCH_CONFIGS = [
     # },
 ]
 
-# Job sites that JobSpy should query.
-SITES = ["linkedin"]
+# ==================================================
+# SOURCES
+# ==================================================
+
+# Search sites, through JobSpy (each one runs every search term).
+# Possible: "linkedin", "indeed", "glassdoor", "google".
+SITES = ["linkedin", "indeed"]
+
+# Arbeitnow: a German job board with a free API (no search: JobRadar reads
+# its newest pages and keeps the tech jobs).
+ARBEITNOW_PAGES = 5          # 0 = off
+
+# Company career pages. Add a company's Greenhouse token or Lever name
+# (from its careers URL) and check it first with:  python sources_check.py
+GREENHOUSE_BOARDS = ["n26", "getyourguide", "hellofresh", "celonis", "contentful",
+                     "sumup", "traderepublic", "raisin", "commercetools", "solarisbank"]      
+LEVER_COMPANIES = []         # e.g. ["somecompany"]
 
 RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72
@@ -76,3 +105,10 @@ DB_PATH = "data/jobradar.db"  # every job ever seen + your status for it
 # Jobs posted longer ago than this are probably filled or closed: they stay
 # in the database but are left out of the ranking.
 MAX_JOB_AGE_DAYS = 30
+
+# The printed report lists every job except these buckets (all jobs are
+# always in data/output/jobs.csv) ...
+REPORT_HIDE_BUCKETS = ("skip",)
+
+# ... and prints full details only for these.
+REPORT_DETAIL_BUCKETS = ("apply_now", "apply_with_research", "long_shot")

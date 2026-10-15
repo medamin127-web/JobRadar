@@ -1,8 +1,9 @@
 # JobRadar
 
-Personal international job search engine. It scrapes tech jobs from LinkedIn
-(Germany for now), scores them against my profile, and checks whether I can
-realistically take them from Tunisia (visa, relocation, language, remote scope).
+Personal international job search engine. It collects tech jobs from several
+sources (LinkedIn, Indeed, Arbeitnow, company career pages; Germany for now),
+scores them against my profile, and checks whether I can realistically take
+them from Tunisia (visa, relocation, language, remote scope).
 
 ## Setup (Windows PowerShell, Python 3.12)
 
@@ -74,11 +75,37 @@ every job ever scraped, when it was first and last seen, the best
 description found and your status for it. On the first run it imports the
 old files in `data/raw`. To start over, delete the file.
 
-### LinkedIn rate limits (HTTP 429)
+### Sources
 
-LinkedIn refuses requests when you scrape too often. JobRadar now pauses
-between searches, retries a refused search once, and stops cleanly after
-repeated refusals (settings in `config.py`). If a run says "Stopped early",
+Set in `config.py`:
+
+| Source | Setting | How it works |
+| --- | --- | --- |
+| LinkedIn, Indeed (Glassdoor, Google possible) | `SITES` | JobSpy runs every search term on each site, one site after the other |
+| Arbeitnow (German job board, free API) | `ARBEITNOW_PAGES` | reads the newest pages, keeps tech jobs |
+| Company career pages on Greenhouse | `GREENHOUSE_BOARDS` | all of the company's jobs; keeps tech jobs in your countries |
+| Company career pages on Lever | `LEVER_COMPANIES` | same |
+
+The same job found on several sites is shown once ("Found on: indeed,
+linkedin"), keeping the longest description.
+
+Check a source from your computer before adding it:
+
+```powershell
+python sources_check.py                       # Arbeitnow + your configured boards
+python sources_check.py greenhouse n26 celonis
+python sources_check.py guesses               # try a starter list of companies
+```
+
+It prints how many jobs each source has, how many JobRadar would keep, and
+the line to paste into `config.py`.
+
+### Rate limits (HTTP 429)
+
+LinkedIn and Indeed refuse requests when you scrape too often. JobRadar
+pauses between searches, retries a refused search once, and stops a site
+cleanly after repeated refusals while the other sites continue (settings in
+`config.py`). If a run says "Stopped early",
 wait a few hours and use `--offline` in the meantime. Refused job
 descriptions are recovered from earlier runs when possible.
 
@@ -135,6 +162,7 @@ candidate_profile.py    YOUR profile (git-ignored)
 candidate_profile.example.py   template for the file above
 models/                 Job, Profile, WorkExperience, Language, CEFR helpers
 services/               analyzers (skills, experience, eligibility), matchers, scorer, classifier
-sources/                job sources (JobSpy / LinkedIn); new sources implement sources/base.py
+sources/                job sources: jobspy_source (LinkedIn, Indeed), arbeitnow, greenhouse, lever
+sources_check.py        test a source / company board from your computer
 tests/                  unit tests (they never use your real profile)
 ```

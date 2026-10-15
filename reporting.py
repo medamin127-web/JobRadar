@@ -140,6 +140,7 @@ def print_details(job_objects) -> None:
         print(f"\n{job.title}{'   [NEW]' if job.is_new else ''}")
         print(f"Company: {job.company}")
         print(f"Id: {short_id(job.id)}   Posted/first seen: {job.age_days} days ago   Status: {job.status}")
+        print(f"Found on: {job.found_on or job.site}   {job.job_url or ''}")
         print(f"Location: {job.location}")
         print(f"Match Score: {job.match_score}/100")
         print(f"Confidence: {job.confidence}")

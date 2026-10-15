@@ -52,14 +52,17 @@ class TestMain(unittest.TestCase):
         original_stdout = sys.stdout
         original_cwd = os.getcwd()
         original = (scraper.load_profile, scraper.build_source,
-                    scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES)
+                    scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES,
+                    scraper.build_feeds, scraper.SITES)
 
         scraper.load_profile = make_profile
-        scraper.build_source = FakeSource
+        scraper.build_source = lambda site: FakeSource()
         scraper.SEARCH_CONFIGS = [
             {"location": "Testland", "search_terms": ["Software Engineer"]}
         ]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
+        scraper.build_feeds = lambda: []
+        scraper.SITES = ["linkedin"]
 
         with tempfile.TemporaryDirectory() as directory:
             os.chdir(directory)
@@ -82,7 +85,8 @@ class TestMain(unittest.TestCase):
             finally:
                 os.chdir(original_cwd)
                 (scraper.load_profile, scraper.build_source,
-                 scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES) = original
+                 scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES,
+                 scraper.build_feeds, scraper.SITES) = original
 
         self.assertIs(sys.stdout, original_stdout)
 
@@ -97,10 +101,13 @@ class TestDatabaseRuns(unittest.TestCase):
 
         self.scraper = scraper
         self.original = (scraper.load_profile, scraper.build_source,
-                         scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES)
+                         scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES,
+                         scraper.build_feeds, scraper.SITES)
         scraper.load_profile = make_profile
         scraper.SEARCH_CONFIGS = [{"location": "Testland", "search_terms": ["Dev"]}]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
+        scraper.build_feeds = lambda: []
+        scraper.SITES = ["linkedin"]
 
         self.original_cwd = os.getcwd()
         self.directory = tempfile.TemporaryDirectory()
@@ -110,7 +117,8 @@ class TestDatabaseRuns(unittest.TestCase):
         os.chdir(self.original_cwd)
         self.directory.cleanup()
         (self.scraper.load_profile, self.scraper.build_source,
-         self.scraper.SEARCH_CONFIGS, self.scraper.DELAY_BETWEEN_SEARCHES) = self.original
+         self.scraper.SEARCH_CONFIGS, self.scraper.DELAY_BETWEEN_SEARCHES,
+         self.scraper.build_feeds, self.scraper.SITES) = self.original
 
     def run_main(self, argv, frame=None):
         import contextlib
@@ -123,7 +131,9 @@ class TestDatabaseRuns(unittest.TestCase):
         def no_scraping():
             raise AssertionError("must not scrape")
 
-        self.scraper.build_source = FakeSource if frame is not None else no_scraping
+        self.scraper.build_source = (
+            (lambda site: FakeSource()) if frame is not None else (lambda site: no_scraping())
+        )
 
         with contextlib.redirect_stdout(io.StringIO()) as printed:
             self.scraper.main(argv)
