@@ -46,6 +46,20 @@ RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72
 
 # ==================================================
+# BEING GENTLE WITH LINKEDIN (HTTP 429 = "too many requests")
+# ==================================================
+
+# Random pause between two searches, in seconds.
+DELAY_BETWEEN_SEARCHES = (6, 15)
+
+# When a search is refused: wait this long, then retry it once.
+RATE_LIMIT_WAIT_SECONDS = 90
+
+# Stop scraping after this many refused searches in a row and process
+# what was collected. Scraping again usually works after a few hours.
+STOP_AFTER_RATE_LIMITED = 2
+
+# ==================================================
 # FOLDERS (all of data/ and reports/ are git-ignored)
 # ==================================================
 

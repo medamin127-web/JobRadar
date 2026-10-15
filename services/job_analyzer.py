@@ -44,7 +44,8 @@ class JobAnalyzer:
             r"\bgo\s+(?:developer|engineer|programmer|backend)\b",
             r"\(go\)",
             r"(?:python|java|rust|kotlin|typescript|c\+\+|ruby|cloud|aws|kubernetes|docker)\s*(?:,|/|&|and|or)\s*go\b",
-            r"\bgo\s*(?:,|/|&)\s*(?:python|java|rust|kotlin|typescript|c\+\+|ruby|cloud|aws|kubernetes|docker)\b",
+            r"\bgo\s*(?:,|/|&)\s*(?:python|java|rust|kotlin|typescript|c\+\+|ruby|cloud|aws|kubernetes|docker"
+            r"|vue|react|angular|node|javascript|php)\b",
         ],
         "Rust": [
             r"\brust\b",

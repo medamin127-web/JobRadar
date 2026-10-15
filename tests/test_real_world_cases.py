@@ -130,6 +130,7 @@ class TestOffTargetDomains(unittest.TestCase):
             "Software Engineer Mainframe (m/w/d)",
             "Senior Development Engineer Embedded Software (all gender)",
             "SAP ABAP Entwickler - ICM (m/w/d)",
+            "Simulator Software Engineer (m/f/d)",
         ]:
             with self.subTest(title=title):
                 result = self.role(title)
@@ -147,6 +148,39 @@ class TestOffTargetDomains(unittest.TestCase):
     def test_a_field_in_your_target_roles_is_not_off_target(self):
         profile = make_profile(target_roles=["iOS Developer", "Software Engineer"])
         self.assertGreater(self.role("Junior iOS Engineer", profile)["score"], 15)
+
+
+class TestSecondRunCases(unittest.TestCase):
+    """From the run of 2026-10-14 after Phase 1a."""
+
+    def test_hdi_mind_c1_after_both_languages_is_c1(self):
+        text = "Teamgeist, Kommunikationsstärke und gute Deutsch- und Englischkenntnisse (mind C1)"
+        self.assertEqual(analyze_german_requirement(text, "de")["level_value"], 5)
+
+    def test_aracom_go_and_vue_detects_go(self):
+        from services.job_analyzer import JobAnalyzer
+
+        skills = JobAnalyzer().extract_skills("Senior Fullstack-Entwickler (m/w/d) – Go & Vue.js")
+        self.assertIn("Go", skills)
+        self.assertIn("Vue.js", skills)
+
+    def test_go_as_an_english_word_is_not_a_skill(self):
+        from services.job_analyzer import JobAnalyzer
+
+        skills = JobAnalyzer().extract_skills("Ready to go? We build React apps and go live weekly.")
+        self.assertNotIn("Go", skills)
+
+    def test_softwareingenieur_is_a_software_role(self):
+        result = JobMatcher.match_role(Job(title="Softwareingenieur (m/w/d)"), make_profile())
+        self.assertGreaterEqual(result["score"], 65)
+
+    def test_obvious_skills_are_implied(self):
+        result = JobMatcher.match_skills(
+            Job(skills=["SQL", "GitHub", "GitLab", "Docker"]), make_profile()
+        )
+
+        self.assertEqual(result["matched_skills"], ["github", "gitlab", "sql"])
+        self.assertEqual(result["missing_skills"], ["docker"])
 
 
 class TestScoring(unittest.TestCase):

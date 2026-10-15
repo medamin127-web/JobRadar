@@ -201,6 +201,7 @@ SHARED_FILLER = {
     "and", "und", "or", "oder", "both", "beide", "sowie", "auf", "in",
     "at", "skills", "kenntnisse", "kenntnissen", "level", "niveau",
     "sprachkenntnisse", "language", "sprache", "sprachen", "der", "die", "of",
+    "mind", "mindestens", "min", "minimum", "least",
 }
 
 OTHER_LANGUAGE = re.compile(

@@ -11,7 +11,10 @@ OFF_TARGET_DOMAINS = {
     "native iOS": r"\bios\b|\bswift\b",
     "native Android": r"\bandroid\b",
     "embedded / firmware": r"\bembedded\b|\bfirmware\b",
-    "flight / space software": r"\bflight software\b|\bavionics\b|\bspacecraft\b",
+    "flight / space / simulation software": (
+        r"\bflight software\b|\bavionics\b|\bspacecraft\b|\bsatellite\b"
+        r"|\bsimulat(?:or|ion) software\b"
+    ),
     "SAP / ABAP": r"\babap\b|\bsap\s+(?:developer|entwickler|berater|consultant|basis)",
     "mainframe": r"\bmainframe\b|\bcobol\b",
     "hardware / sensors": r"\bfpga\b|\bhardware\b|\bcalibration\b",
@@ -22,6 +25,31 @@ OFF_TARGET_DOMAINS = {
 CROSS_PLATFORM = re.compile(r"\bflutter\b|\breact native\b", re.IGNORECASE)
 
 OFF_TARGET_ROLE_SCORE = 15
+
+
+# Skills that come with another skill you list, so you don't have to list
+# the obvious ones (and they don't show up as "missing").
+# Keys and values use the normalized spelling (lowercase, "-" and "/"
+# become spaces).
+IMPLIED_SKILLS = {
+    "postgresql": ["sql"],
+    "mysql": ["sql"],
+    "sql server": ["sql"],
+    "git": ["github", "gitlab"],
+    "typescript": ["javascript"],
+    "react": ["javascript", "html", "css"],
+    "vue.js": ["javascript", "html", "css"],
+    "angular": ["typescript", "javascript", "html", "css"],
+    "next.js": ["react", "javascript"],
+    "node.js": ["javascript"],
+    "express.js": ["node.js", "javascript"],
+    "laravel": ["php"],
+    "symfony": ["php"],
+    "flask": ["python"],
+    "django": ["python"],
+    "fastapi": ["python"],
+    "spring boot": ["spring", "java"],
+}
 
 
 ROLE_FAMILIES = {
@@ -48,6 +76,12 @@ ROLE_FAMILIES = {
         "software development",
         "softwareentwickler",
         "softwareentwicklerin",
+        "software entwickler",
+        "softwareingenieur",
+        "software ingenieur",
+        "anwendungsentwickler",
+        "applikationsentwickler",
+        "application developer",
     ],
 
     "web_development": [
@@ -434,6 +468,21 @@ class JobMatcher:
         return None
 
     @classmethod
+    def expand_skills(cls, skills) -> set[str]:
+        """Your skills plus the ones they imply (normalized names)."""
+
+        expanded = {
+            cls._normalize_text(skill)
+            for skill in skills or []
+            if skill
+        }
+
+        for skill in list(expanded):
+            expanded.update(IMPLIED_SKILLS.get(skill, []))
+
+        return expanded
+
+    @classmethod
     def _compare_role_families(
         cls,
         job_title: str,
@@ -603,11 +652,7 @@ class JobMatcher:
             if skill
         }
 
-        candidate_skills = {
-            cls._normalize_text(skill)
-            for skill in profile.skills
-            if skill
-        }
+        candidate_skills = cls.expand_skills(profile.skills)
 
         if not job_skills:
 

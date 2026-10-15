@@ -26,6 +26,31 @@ def save_raw(jobs: pd.DataFrame, raw_dir: str = RAW_DIR) -> None:
     )
 
 
+def raw_files(raw_dir: str = RAW_DIR) -> list[str]:
+    """All saved raw scrapes, oldest first."""
+    return sorted(glob.glob(os.path.join(raw_dir, "jobs_raw_*.csv")))
+
+
+def load_raw(paths) -> pd.DataFrame:
+    """Read saved raw scrapes and stack them (duplicates are removed later)."""
+
+    frames = []
+
+    for path in paths:
+        try:
+            frames.append(pd.read_csv(path))
+        except Exception as error:
+            print(f"Could not read {path}: {error}")
+
+    frames = [frame for frame in frames if not frame.empty]
+
+    if not frames:
+        return pd.DataFrame()
+
+    # Newest first, so de-duplication keeps the most recent copy of a job.
+    return pd.concat(frames[::-1], ignore_index=True)
+
+
 def fill_missing_descriptions(jobs: pd.DataFrame, raw_dir: str = RAW_DIR):
     """Recover descriptions LinkedIn refused to serve (429) from earlier runs."""
 
@@ -34,7 +59,7 @@ def fill_missing_descriptions(jobs: pd.DataFrame, raw_dir: str = RAW_DIR):
 
     cache = {}
 
-    for path in sorted(glob.glob(os.path.join(raw_dir, "jobs_raw_*.csv"))):
+    for path in raw_files(raw_dir):
         try:
             old = pd.read_csv(path, usecols=["id", "description"])
         except Exception:
@@ -74,7 +99,7 @@ def save_csv_safely(
 
     os.makedirs(directory, exist_ok=True)
 
-    path = os.path.join(directory, name)
+    path = os.path.normpath(os.path.join(directory, name))
 
     try:
         frame.to_csv(path, index=False, encoding="utf-8-sig")
@@ -82,10 +107,10 @@ def save_csv_safely(
     except PermissionError:
         stem, extension = os.path.splitext(name)
 
-        fallback = os.path.join(
+        fallback = os.path.normpath(os.path.join(
             directory,
             f"{stem}_{datetime.now():%Y%m%d_%H%M%S}{extension}",
-        )
+        ))
 
         frame.to_csv(fallback, index=False, encoding="utf-8-sig")
 

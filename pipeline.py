@@ -6,6 +6,9 @@ The JobRadar pipeline as plain functions. Importing this file does nothing.
     jobs_to_frame() ->  DataFrame ready for the CSV
 """
 
+import random
+import time
+
 import pandas as pd
 
 from services import (
@@ -65,10 +68,40 @@ def order_columns(frame: pd.DataFrame) -> pd.DataFrame:
 # 1. COLLECT
 # ==================================================
 
-def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame:
-    """Run every search of every config and return all results together."""
+def collect_jobs(
+    source,
+    configs,
+    results_per_search,
+    hours_old,
+    delay=(0, 0),
+    rate_limit_wait=0,
+    stop_after_rate_limited=2,
+    sleep=time.sleep,
+) -> pd.DataFrame:
+    """
+    Run every search of every config and return all results together.
+
+    Between searches it pauses for a random number of seconds (delay).
+    A refused search (HTTP 429) is retried once after rate_limit_wait
+    seconds. After stop_after_rate_limited refused searches in a row it
+    stops and returns what it has.
+    """
 
     all_jobs = []
+    searches = 0
+    refused = []
+    refused_in_a_row = 0
+
+    def run(search_term, location):
+        return source.search(
+            search_term=search_term,
+            location=location,
+            results_wanted=results_per_search,
+            hours_old=hours_old,
+        )
+
+    def was_refused():
+        return getattr(source, "last_search_rate_limited", False)
 
     for config in configs:
 
@@ -80,19 +113,47 @@ def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame
 
         for search_term in config["search_terms"]:
 
+            if refused_in_a_row >= stop_after_rate_limited:
+                break
+
+            if searches:
+                sleep(random.uniform(*delay))
+
+            searches += 1
+
             print(f"\nSearching: {search_term} | {location}")
 
-            scraped = source.search(
-                search_term=search_term,
-                location=location,
-                results_wanted=results_per_search,
-                hours_old=hours_old,
-            )
+            scraped = run(search_term, location)
 
-            print(f"Found {len(scraped)} jobs")
+            if was_refused():
+                print(
+                    f"LinkedIn refused this search (HTTP 429). "
+                    f"Waiting {rate_limit_wait}s and retrying once..."
+                )
+                sleep(rate_limit_wait)
+                scraped = run(search_term, location)
+
+            if was_refused():
+                refused.append(f"{search_term} | {location}")
+                refused_in_a_row += 1
+                print("Still refused. Skipping this search.")
+            else:
+                refused_in_a_row = 0
+                print(f"Found {len(scraped)} jobs")
+
+                failures = getattr(source, "last_description_failures", 0)
+
+                if failures:
+                    print(
+                        f"  ({failures} job descriptions refused; "
+                        "earlier runs may still have them)"
+                    )
 
             if not scraped.empty:
                 all_jobs.append(scraped)
+
+        if refused_in_a_row >= stop_after_rate_limited:
+            break
 
     jobs = (
         pd.concat(all_jobs, ignore_index=True)
@@ -101,6 +162,19 @@ def collect_jobs(source, configs, results_per_search, hours_old) -> pd.DataFrame
     )
 
     print(f"\nTotal jobs collected: {len(jobs)}")
+
+    if refused:
+        print(f"Searches refused by LinkedIn: {len(refused)}")
+
+        for item in refused:
+            print(f"  - {item}")
+
+        if refused_in_a_row >= stop_after_rate_limited:
+            print(
+                "Stopped early: LinkedIn keeps refusing requests. "
+                "Wait a few hours before scraping again, or use "
+                "'python scraper.py --offline' to work with saved data."
+            )
 
     return jobs
 
