@@ -51,23 +51,29 @@ def load_raw(paths) -> pd.DataFrame:
     return pd.concat(frames[::-1], ignore_index=True)
 
 
-def fill_missing_descriptions(jobs: pd.DataFrame, raw_dir: str = RAW_DIR):
-    """Recover descriptions LinkedIn refused to serve (429) from earlier runs."""
+def fill_missing_descriptions(jobs: pd.DataFrame, cache: dict = None, raw_dir: str = RAW_DIR):
+    """
+    Recover descriptions LinkedIn refused to serve (429) from earlier runs.
+
+    cache: id -> description (from the database). Without it, the saved
+    raw files in raw_dir are read instead.
+    """
 
     if jobs.empty or "id" not in jobs.columns or "description" not in jobs.columns:
         return jobs
 
-    cache = {}
+    if cache is None:
+        cache = {}
 
-    for path in raw_files(raw_dir):
-        try:
-            old = pd.read_csv(path, usecols=["id", "description"])
-        except Exception:
-            continue
+        for path in raw_files(raw_dir):
+            try:
+                old = pd.read_csv(path, usecols=["id", "description"])
+            except Exception:
+                continue
 
-        for job_id, text in zip(old["id"], old["description"]):
-            if isinstance(text, str) and text.strip():
-                cache[job_id] = text
+            for job_id, text in zip(old["id"], old["description"]):
+                if isinstance(text, str) and text.strip():
+                    cache[job_id] = text
 
     missing = jobs["description"].isna() | (
         jobs["description"].astype(str).str.strip() == ""

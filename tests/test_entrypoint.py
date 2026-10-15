@@ -87,63 +87,104 @@ class TestMain(unittest.TestCase):
         self.assertIs(sys.stdout, original_stdout)
 
 
-class TestOfflineMode(unittest.TestCase):
-    """--offline re-analyzes saved raw files and never scrapes."""
+class TestDatabaseRuns(unittest.TestCase):
+    """main() with the database, in a temp folder, with fake sources."""
 
-    def test_offline_uses_saved_files_and_never_scrapes(self):
-        import contextlib
-        import io
-
+    def setUp(self):
         import scraper
 
         from .helpers import make_profile
-        from .test_pipeline import raw_frame
+
+        self.scraper = scraper
+        self.original = (scraper.load_profile, scraper.build_source,
+                         scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES)
+        scraper.load_profile = make_profile
+        scraper.SEARCH_CONFIGS = [{"location": "Testland", "search_terms": ["Dev"]}]
+        scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
+
+        self.original_cwd = os.getcwd()
+        self.directory = tempfile.TemporaryDirectory()
+        os.chdir(self.directory.name)
+
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        self.directory.cleanup()
+        (self.scraper.load_profile, self.scraper.build_source,
+         self.scraper.SEARCH_CONFIGS, self.scraper.DELAY_BETWEEN_SEARCHES) = self.original
+
+    def run_main(self, argv, frame=None):
+        import contextlib
+        import io
+
+        class FakeSource:
+            def search(self, **kwargs):
+                return frame.copy()
 
         def no_scraping():
-            raise AssertionError("offline mode must not build a source")
+            raise AssertionError("must not scrape")
 
-        original = (scraper.load_profile, scraper.build_source)
-        scraper.load_profile = make_profile
-        scraper.build_source = no_scraping
+        self.scraper.build_source = FakeSource if frame is not None else no_scraping
 
-        original_cwd = os.getcwd()
+        with contextlib.redirect_stdout(io.StringIO()) as printed:
+            self.scraper.main(argv)
 
-        with tempfile.TemporaryDirectory() as directory:
-            os.chdir(directory)
+        return printed.getvalue()
 
-            try:
-                os.makedirs("data/raw")
-                raw_frame().to_csv("data/raw/jobs_raw_20260101_000000.csv", index=False)
-                raw_frame().to_csv("data/raw/jobs_raw_20260102_000000.csv", index=False)
+    def frame(self):
+        from datetime import date
 
-                with contextlib.redirect_stdout(io.StringIO()) as printed:
-                    scraper.main(["--offline"])
+        from .test_pipeline import raw_frame
 
-                output = printed.getvalue()
+        frame = raw_frame()
+        frame["date_posted"] = date.today().isoformat()
+        return frame
 
-                self.assertIn("analyzing 2 saved raw file(s)", output)
-                self.assertIn("Unique jobs after deduplication: 3", output)
-                self.assertTrue(os.path.exists("data/output/jobs.csv"))
+    def test_first_scrape_marks_everything_new_second_marks_nothing(self):
+        first = self.run_main([], self.frame())
+        self.assertIn("New jobs (never seen before): 4", first)
+        self.assertIn("New in this run: 3", first)      # 4 ids, 3 unique jobs
 
-                # No new raw file is written in offline mode.
-                self.assertEqual(len(os.listdir("data/raw")), 2)
-            finally:
-                os.chdir(original_cwd)
-                scraper.load_profile, scraper.build_source = original
+        second = self.run_main([], self.frame())
+        self.assertIn("New jobs (never seen before): 0", second)
+        self.assertTrue(os.path.exists("data/jobradar.db"))
 
-    def test_no_saved_files_gives_a_clear_message(self):
-        import scraper
+    def test_offline_ranks_the_database_and_never_scrapes(self):
+        self.run_main([], self.frame())
 
-        original_cwd = os.getcwd()
-        original = scraper.load_profile
-        scraper.load_profile = lambda: None
+        output = self.run_main(["--offline"])
 
-        with tempfile.TemporaryDirectory() as directory:
-            os.chdir(directory)
+        self.assertIn("Offline mode", output)
+        self.assertIn("Unique jobs after deduplication: 3", output)
 
-            try:
-                with self.assertRaisesRegex(SystemExit, "No saved raw files"):
-                    scraper.main(["--offline"])
-            finally:
-                os.chdir(original_cwd)
-                scraper.load_profile = original
+    def test_old_raw_files_are_imported_on_the_first_run(self):
+        from datetime import datetime
+
+        os.makedirs("data/raw")
+        name = f"jobs_raw_{datetime.now():%Y%m%d_%H%M%S}.csv"
+        self.frame().to_csv(os.path.join("data/raw", name), index=False)
+
+        output = self.run_main(["--offline"])
+
+        self.assertIn("imported 4 jobs from data/raw", output)
+        self.assertIn("Unique jobs after deduplication: 3", output)
+
+    def test_jobs_you_marked_leave_the_ranking(self):
+        from database import JobStore
+
+        self.run_main([], self.frame())
+
+        with JobStore("data/jobradar.db") as store:
+            store.set_status("1", "applied", "sent CV")
+            store.set_status("2", "not_interested")
+
+        output = self.run_main(["--offline"])
+        ranking = output.split("JOBRADAR MATCH RANKING")[1].split("JOBRADAR DATASET")[0]
+
+        self.assertIn("YOUR APPLICATIONS (1)", output)
+        self.assertIn("sent CV", output)
+        self.assertIn("Hidden (not interested / closed): 1", output)
+        self.assertNotIn("Beispiel GmbH", ranking)
+
+    def test_offline_with_an_empty_database_explains_what_to_do(self):
+        with self.assertRaisesRegex(SystemExit, "database is empty"):
+            self.run_main(["--offline"])

@@ -130,7 +130,6 @@ class TestOffTargetDomains(unittest.TestCase):
             "Software Engineer Mainframe (m/w/d)",
             "Senior Development Engineer Embedded Software (all gender)",
             "SAP ABAP Entwickler - ICM (m/w/d)",
-            "Simulator Software Engineer (m/f/d)",
         ]:
             with self.subTest(title=title):
                 result = self.role(title)
@@ -181,6 +180,83 @@ class TestSecondRunCases(unittest.TestCase):
 
         self.assertEqual(result["matched_skills"], ["github", "gitlab", "sql"])
         self.assertEqual(result["missing_skills"], ["docker"])
+
+
+class TestYourLabels(unittest.TestCase):
+    """From your first `labels.py evaluate` (2026-10-15)."""
+
+    def test_westwing_german_is_a_plus_on_its_own_line(self):
+        text = "Excellent written and verbal communication skills; German is a plus"
+        self.assertEqual(analyze_german_requirement(text, "en")["requirement"], "optional")
+
+    def test_simulator_software_is_your_field(self):
+        result = JobMatcher.match_role(Job(title="Simulator Software Engineer (m/f/d)"), make_profile())
+        self.assertGreaterEqual(result["score"], 65)
+
+    def test_flight_software_is_still_off_target(self):
+        result = JobMatcher.match_role(Job(title="Senior Flight Software Engineer"), make_profile())
+        self.assertLessEqual(result["score"], 15)
+
+    def stretch(self, **kwargs):
+        values = dict(
+            title="Senior Full Stack Engineer", description="x", has_description=True,
+            visa_sponsorship_status="unknown", relocation_support="unknown",
+            german_requirement="none_mentioned", work_mode="hybrid",
+            remote_scope="unknown", work_authorization_required=False,
+            english_working_language=False, international_friendly=False,
+            target_category="stretch_target", match_score=66, match_coverage=80,
+            role_match_score=90, skills_match_score=67,
+            experience_match_score=None, seniority_match_score=50,
+        )
+        values.update(kwargs)
+        return evaluate(Job(**values))
+
+    def test_senior_title_without_years_and_good_skills_is_recommended(self):
+        # LiveEO, Westwing, lemon.markets: you would apply.
+        self.assertEqual(self.stretch().application_bucket, "apply_with_research")
+
+    def test_senior_with_a_small_experience_gap_is_recommended(self):
+        # Snke: 2+ years asked, you have 1.25 (experience score 75).
+        job = self.stretch(experience_match_score=75, match_score=70, skills_match_score=60)
+        self.assertEqual(job.application_bucket, "apply_with_research")
+
+    def test_senior_with_weak_skills_stays_a_long_shot(self):
+        # JetBrains AppGlass: Kotlin/.NET, 40% skills. You would not apply.
+        job = self.stretch(match_score=59, skills_match_score=40)
+        self.assertEqual(job.application_bucket, "long_shot")
+
+    def test_senior_with_a_big_experience_gap_stays_a_long_shot(self):
+        job = self.stretch(experience_match_score=55)  # ~2 years short
+        self.assertEqual(job.application_bucket, "long_shot")
+
+
+class TestRelocationRefusalMeansNoVisa(unittest.TestCase):
+
+    def test_wolt_relocation_refused_and_no_visa_statement_is_visa_no(self):
+        from services.eligibility_analyzer import EligibilityAnalyzer
+
+        job = Job(title="Senior Software Engineer", description=(
+            "We build great products for millions of customers in many countries. "
+            "We work in distributed teams, but may not be able to support fully "
+            "remote work or relocation. You will join a team of engineers working "
+            "on the backend with Go and Kotlin and you will own features end to end."
+        ))
+
+        EligibilityAnalyzer.analyze(job)
+
+        self.assertEqual(job.relocation_support, "no")
+        self.assertEqual(job.visa_sponsorship_status, "no")
+
+    def test_an_explicit_visa_offer_is_not_overruled(self):
+        from services.eligibility_analyzer import EligibilityAnalyzer
+
+        job = Job(title="Engineer", description=(
+            "We offer visa sponsorship for this role. Relocation is not offered."
+        ))
+
+        EligibilityAnalyzer.analyze(job)
+
+        self.assertEqual(job.visa_sponsorship_status, "yes")
 
 
 class TestScoring(unittest.TestCase):

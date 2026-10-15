@@ -38,6 +38,8 @@ CONFIDENCE_RANK = {
 # Columns you read first; the rest follow in their natural order.
 FRONT_COLUMNS = [
     "application_bucket",
+    "is_new",
+    "age_days",
     "eligibility_status",
     "match_score",
     "ranking_score",
@@ -54,6 +56,9 @@ FRONT_COLUMNS = [
     "work_mode",
     "remote_scope",
     "job_url",
+    "status",
+    "status_note",
+    "id",
 ]
 
 
@@ -317,6 +322,47 @@ def process_jobs(jobs: pd.DataFrame, profile) -> list:
     sort_jobs(job_objects)
 
     return job_objects
+
+
+# ==================================================
+# 7. TRACKING (database status, new / old)
+# ==================================================
+
+def attach_tracking(job_objects, info: dict, new_ids=()) -> None:
+    """Copy first_seen / age / your status from the database onto each job."""
+
+    new_ids = set(new_ids)
+
+    for job in job_objects:
+        details = info.get(job.id, {})
+
+        job.is_new = job.id in new_ids
+        job.first_seen = details.get("first_seen")
+        job.age_days = details.get("age_days")
+        job.status = details.get("status") or "open"
+        job.status_note = details.get("status_note")
+
+
+def split_by_status(job_objects):
+    """
+    -> (to_rank, applied, hidden)
+
+    to_rank: jobs you have not acted on yet (the ranking)
+    applied: jobs you applied to (listed separately)
+    hidden:  not_interested / closed (left out)
+    """
+
+    to_rank, applied, hidden = [], [], []
+
+    for job in job_objects:
+        if job.status == "applied":
+            applied.append(job)
+        elif job.status in ("not_interested", "closed"):
+            hidden.append(job)
+        else:
+            to_rank.append(job)
+
+    return to_rank, applied, hidden
 
 
 def jobs_to_frame(job_objects) -> pd.DataFrame:

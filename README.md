@@ -45,15 +45,34 @@ git commit -m "JobRadar phase 0"
 # 1. Run the tests (should end with OK)
 python -m unittest discover -s tests -t .
 
-# 2. Scrape LinkedIn, then score and rank
+# 2. Scrape LinkedIn, save to the database, then score and rank
 python scraper.py
 
-# 3. No scraping: re-analyze everything saved in data/raw
+# 3. No scraping: rank what is already in the database
 #    (after editing candidate_profile.py or the code, or while LinkedIn
 #    is refusing requests)
 python scraper.py --offline
-python scraper.py --raw data\raw\jobs_raw_20261014_011247.csv   # one file only
+python scraper.py --raw data\raw\jobs_raw_20261014_011247.csv   # one raw file only
+
+# 4. Your applications
+python track.py                         # what to look at now + your applications
+python track.py applied 4477572741 "sent CV 15/10"
+python track.py no 4460378155           # not interested: hide it
+python track.py closed 4460378155       # posting closed: hide it
+python track.py open 4460378155         # undo
 ```
+
+Every run ranks all saved jobs posted in the last 30 days (`MAX_JOB_AGE_DAYS`
+in `config.py`) that you have not marked. Jobs found for the first time are
+marked **NEW**. The id to use with `track.py` is shown at the end of each
+ranking line (`id 4477572741`); the last 6 digits are enough.
+
+### The database
+
+`data/jobradar.db` (SQLite, built into Python, nothing to install) remembers
+every job ever scraped, when it was first and last seen, the best
+description found and your status for it. On the first run it imports the
+old files in `data/raw`. To start over, delete the file.
 
 ### LinkedIn rate limits (HTTP 429)
 
@@ -66,20 +85,23 @@ descriptions are recovered from earlier runs when possible.
 ### Measuring accuracy (labels)
 
 ```powershell
-python labels.py export     # writes data\labels\labels.csv
-#   open it in Excel, fill the true_... columns, save as CSV
-python labels.py evaluate   # accuracy per field + every disagreement
+python labels.py label      # one job at a time, 4 questions, one key each
+python labels.py evaluate   # where JobRadar disagrees with you
+python labels.py review     # go through each disagreement: who is right?
 ```
 
-Re-running `export` keeps your answers. Instructions are at the top of
-`labels.py`.
+`label` shows a job and asks: would you apply? is it your field? what does it
+say about visa? about German? Enter accepts JobRadar's guess in [brackets],
+`d` shows the whole description, `o` opens the job in your browser, `s` skips,
+`q` stops (answers are saved after every job). About 20 jobs is enough.
 
 ## Where things are saved (all git-ignored)
 
 | Path | What |
 | --- | --- |
 | `data/output/jobs.csv` | ranked jobs. First columns: `application_bucket`, `eligibility_status`, `match_score`, `bucket_reason`, blockers and warnings. If the file is open in Excel, a timestamped copy is written next to it |
-| `data/raw/jobs_raw_*.csv` | raw scrape of each run. Used by `--offline`, by `labels.py` and to recover refused descriptions. **Keep this folder** |
+| `data/jobradar.db` | the database: every job + your status. **Keep this file** |
+| `data/raw/jobs_raw_*.csv` | backup copy of each raw scrape (the database is the main store) |
 | `data/labels/labels.csv` | your hand labels |
 | `reports/run_*.txt` | full console report of each run (UTF-8) |
 
@@ -104,9 +126,11 @@ alone is not visa help. Inside a bucket, jobs that state visa support come first
 scraper.py              entry point: python scraper.py [--offline | --raw FILE]
 config.py               searches, sites, folders  <- edit this to change what is searched
 pipeline.py             collect -> dedupe -> normalize -> analyze -> score -> sort
-storage.py              raw copies, description cache, CSV saving
+database.py             SQLite memory: jobs, first/last seen, your status
+track.py                mark jobs applied / not interested / closed
+storage.py              raw backup copies, CSV saving
 reporting.py            everything that is printed + the UTF-8 report file
-labels.py               hand labels: export / evaluate accuracy
+labels.py               your answers: label / evaluate accuracy
 candidate_profile.py    YOUR profile (git-ignored)
 candidate_profile.example.py   template for the file above
 models/                 Job, Profile, WorkExperience, Language, CEFR helpers

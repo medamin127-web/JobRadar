@@ -67,3 +67,12 @@ RAW_DIR = "data/raw"          # raw scrape of every run (description cache)
 OUTPUT_DIR = "data/output"    # jobs.csv
 REPORTS_DIR = "reports"       # full text report of every run (UTF-8)
 OUTPUT_FILE = "jobs.csv"
+DB_PATH = "data/jobradar.db"  # every job ever seen + your status for it
+
+# ==================================================
+# WHICH SAVED JOBS ARE SHOWN
+# ==================================================
+
+# Jobs posted longer ago than this are probably filled or closed: they stay
+# in the database but are left out of the ranking.
+MAX_JOB_AGE_DAYS = 30

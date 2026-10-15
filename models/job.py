@@ -143,10 +143,20 @@ class Job:
     application_bucket: Optional[str] = None
     bucket_reason: Optional[str] = None
     ranking_score: Optional[float] = None
+
+    # -------------------------------
+    # Tracking (from the database)
+    # -------------------------------
+
+    is_new: Optional[bool] = None        # first seen in this scrape
+    age_days: Optional[int] = None       # days since posted (or first seen)
+    first_seen: Optional[str] = None
+    status: Optional[str] = None         # open | applied | not_interested | closed
+    status_note: Optional[str] = None
     
      
     def to_dict(self):
         """
         Convert the Job object into a dictionary.
         """
-        return asdict(self)
+        return asdict(self)

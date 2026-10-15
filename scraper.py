@@ -1,9 +1,13 @@
 """
 JobRadar entry point.
 
-    python scraper.py                  scrape LinkedIn, then analyze and rank
-    python scraper.py --offline        no scraping: re-analyze every saved raw file
-    python scraper.py --raw FILE.csv   no scraping: re-analyze one saved raw file
+    python scraper.py                  scrape LinkedIn, save to the database, rank
+    python scraper.py --offline        no scraping: rank what is in the database
+    python scraper.py --raw FILE.csv   no scraping: analyze one raw CSV only
+
+Every run ranks all saved jobs that are still current (posted within
+MAX_JOB_AGE_DAYS) and that you have not marked applied / not interested /
+closed (see track.py). Jobs found for the first time are marked NEW.
 
 Offline mode is what you use after changing candidate_profile.py or the
 analyzers, or while LinkedIn is refusing requests.
@@ -16,8 +20,10 @@ happens inside main().
 import argparse
 
 from config import (
+    DB_PATH,
     DELAY_BETWEEN_SEARCHES,
     HOURS_OLD,
+    MAX_JOB_AGE_DAYS,
     RATE_LIMIT_WAIT_SECONDS,
     REPORTS_DIR,
     RESULTS_PER_SEARCH,
@@ -25,8 +31,16 @@ from config import (
     SITES,
     STOP_AFTER_RATE_LIMITED,
 )
-from pipeline import collect_jobs, jobs_to_frame, process_jobs
+from database import JobStore
+from pipeline import (
+    attach_tracking,
+    collect_jobs,
+    jobs_to_frame,
+    process_jobs,
+    split_by_status,
+)
 from reporting import (
+    print_applications,
     print_details,
     print_ranking,
     print_summary,
@@ -70,7 +84,7 @@ def parse_args(argv=None):
     mode.add_argument(
         "--offline",
         action="store_true",
-        help="do not scrape; re-analyze every file in data/raw",
+        help="do not scrape; rank the jobs saved in the database",
     )
 
     mode.add_argument(
@@ -98,39 +112,71 @@ def scrape():
     return raw
 
 
-def load_saved(args):
-    paths = [args.raw] if args.raw else raw_files()
+def open_store() -> JobStore:
+    """Open the database; the first time, import the old data/raw files."""
 
-    if not paths:
-        raise SystemExit("No saved raw files found in data/raw.")
+    store = JobStore(DB_PATH)
 
-    print(f"Offline mode: analyzing {len(paths)} saved raw file(s), no scraping.")
+    if store.count() == 0 and raw_files():
+        added = store.import_raw_files(raw_files())
+        print(f"First run with the database: imported {added} jobs from data/raw.")
 
-    raw = load_raw(paths)
+    return store
 
-    print(f"Total saved jobs loaded: {len(raw)}")
 
-    return raw
+def collect(args, store):
+    """-> (raw jobs to analyze, ids that are new)"""
+
+    if args.raw:
+        print(f"Analyzing one raw file, no scraping: {args.raw}")
+        raw = fill_missing_descriptions(load_raw([args.raw]), store.descriptions())
+        return raw, set()
+
+    new_ids = set()
+
+    if args.offline:
+        if store.count() == 0:
+            raise SystemExit("The database is empty. Run python scraper.py first.")
+
+        print("Offline mode: no scraping, ranking the jobs in the database.")
+    else:
+        scraped = scrape()
+
+        # Recover descriptions LinkedIn refused to serve (HTTP 429)
+        # from earlier runs, then remember everything.
+        scraped = fill_missing_descriptions(scraped, store.descriptions())
+        new_ids = store.save_scraped(scraped)
+
+        print(f"New jobs (never seen before): {len(new_ids)}")
+
+    raw = store.load(max_age_days=MAX_JOB_AGE_DAYS)
+
+    print(
+        f"Jobs in the database: {store.count()}, "
+        f"posted in the last {MAX_JOB_AGE_DAYS} days: {len(raw)}"
+    )
+
+    return raw, new_ids
 
 
 def main(argv=None) -> None:
     args = parse_args(argv)
     profile = load_profile()
 
-    with report_to_file(REPORTS_DIR):
+    with report_to_file(REPORTS_DIR), open_store() as store:
 
-        # 1. Collect (or load saved data)
-        raw = load_saved(args) if (args.offline or args.raw) else scrape()
-
-        # Recover descriptions LinkedIn refused to serve (HTTP 429)
-        # using copies saved by earlier runs.
-        raw = fill_missing_descriptions(raw)
+        # 1. Collect (scrape + save, or load from the database)
+        raw, new_ids = collect(args, store)
 
         # 2. De-duplicate, normalize, analyze, score, sort
         job_objects = process_jobs(raw, profile)
 
-        # 3. Save
-        frame = jobs_to_frame(job_objects)
+        # 3. Your status: hide what you applied to / dismissed
+        attach_tracking(job_objects, store.info(), new_ids)
+        to_rank, applied, hidden = split_by_status(job_objects)
+
+        # 4. Save
+        frame = jobs_to_frame(to_rank + applied)
 
         saved_path = None
 
@@ -138,10 +184,17 @@ def main(argv=None) -> None:
             saved_path = save_csv_safely(frame)
             print(f"\nSaved results to {saved_path}")
 
-        # 4. Report
-        print_ranking(job_objects)
-        print_details(job_objects)
-        print_summary(job_objects, frame, saved_path)
+        # 5. Report
+        print_ranking(to_rank)
+        print_applications(applied)
+        print_details(to_rank)
+        print_summary(to_rank, jobs_to_frame(to_rank), saved_path, {
+            "New in this run": sum(1 for job in to_rank if job.is_new),
+            "Applied (listed separately)": len(applied),
+            "Hidden (not interested / closed)": len(hidden),
+        })
+
+        print("\nMark jobs with: python track.py applied <id>  |  no <id>  |  closed <id>")
 
 
 if __name__ == "__main__":

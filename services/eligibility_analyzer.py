@@ -320,11 +320,13 @@ def analyze_german_requirement(text: str, language: Optional[str]) -> dict:
             not_required_hit = not_required_hit or window
             continue
 
-        if not REQUIREMENT_CUES.search(window):
-            continue
-
+        # Checked before the requirement words: "German is a plus" on its
+        # own line contains no requirement word but is clearly optional.
         if OPTIONAL_CUES.search(window):
             optional_hit = optional_hit or window
+            continue
+
+        if not REQUIREMENT_CUES.search(window):
             continue
 
         level = _nearest_level(
@@ -796,6 +798,12 @@ class EligibilityAnalyzer:
         visa = analyze_visa(text)
         relocation = analyze_relocation(text)
         remote = analyze_remote(job, text)
+
+        # A company that refuses relocation will not bring someone over
+        # from outside the EU either (your label on Wolt's ad).
+        if visa["visa_status"] == "unknown" and relocation["relocation_support"] == "no":
+            visa["visa_status"] = "no"
+            visa["visa_evidence"] = relocation["relocation_evidence"]
 
         return {
             "job_language": language,

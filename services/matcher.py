@@ -11,10 +11,7 @@ OFF_TARGET_DOMAINS = {
     "native iOS": r"\bios\b|\bswift\b",
     "native Android": r"\bandroid\b",
     "embedded / firmware": r"\bembedded\b|\bfirmware\b",
-    "flight / space / simulation software": (
-        r"\bflight software\b|\bavionics\b|\bspacecraft\b|\bsatellite\b"
-        r"|\bsimulat(?:or|ion) software\b"
-    ),
+    "flight software": r"\bflight software\b|\bavionics\b|\bspacecraft\b",
     "SAP / ABAP": r"\babap\b|\bsap\s+(?:developer|entwickler|berater|consultant|basis)",
     "mainframe": r"\bmainframe\b|\bcobol\b",
     "hardware / sensors": r"\bfpga\b|\bhardware\b|\bcalibration\b",

@@ -26,6 +26,14 @@ MIN_SCORE_TO_CONSIDER = 40
 # apply_now also needs a clearly good technical match.
 MIN_SCORE_FOR_APPLY_NOW = 60
 
+# A "Senior" title alone does not rule a job out: many senior ads state
+# no years at all. A stretch job is still recommended when the score and
+# the skills fit and the ad asks for at most ~1 year more than you have
+# (experience score >= 75) or says nothing about years.
+STRETCH_MIN_SCORE = 60
+STRETCH_MIN_SKILLS = 50
+STRETCH_MIN_EXPERIENCE_SCORE = 75
+
 BUCKET_ORDER = {
     "apply_now": 0,
     "apply_with_research": 1,
@@ -263,6 +271,23 @@ class ApplicationBucketer:
             reason = (
                 "Good technical fit; eligibility not confirmed, so check "
                 "visa and language details before applying."
+            )
+
+        elif (
+            status == "possible"
+            and category == "stretch_target"
+            and score >= STRETCH_MIN_SCORE
+            and (job.skills_match_score or 0) >= STRETCH_MIN_SKILLS
+            and (
+                job.experience_match_score is None
+                or job.experience_match_score >= STRETCH_MIN_EXPERIENCE_SCORE
+            )
+        ):
+            bucket = "apply_with_research"
+            reason = (
+                "Stretch: the title is above your level, but your skills fit "
+                "and the ad asks for little or no extra experience. Worth "
+                "applying; check visa and language details first."
             )
 
         elif status == "possible" and category == "stretch_target":
