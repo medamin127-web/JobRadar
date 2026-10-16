@@ -1,13 +1,17 @@
 from .base import JobSource
 from .arbeitnow import ArbeitnowSource
 from .greenhouse import GreenhouseSource
+from .jaabz import JaabzSource
 from .lever import LeverSource
+from .relocateme import RelocateMeSource
 
 __all__ = [
     "JobSource",
     "ArbeitnowSource",
     "GreenhouseSource",
+    "JaabzSource",
     "LeverSource",
+    "RelocateMeSource",
     "JobSpySource",
 ]
 

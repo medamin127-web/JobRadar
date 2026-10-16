@@ -39,6 +39,8 @@ class JobNormalizer:
         "company_description",
         "search_term",
         "found_on",
+        "country",
+        "source_hint",
     ]
 
     def normalize_dataframe(
@@ -139,8 +141,8 @@ class JobNormalizer:
                 row["currency"]
             ),
 
-            description=self.clean_text(
-                row["description"]
+            description=self.clean_description(
+                row["description"], row["site"]
             ),
 
             skills=self.clean_skills(
@@ -170,8 +172,30 @@ class JobNormalizer:
             found_on=self.clean_text(
                 row["found_on"]
             ),
+
+            country=self.clean_text(
+                row["country"]
+            ),
+
+            source_hint=self.clean_text(
+                row["source_hint"]
+            ),
         )
         
+    # Boards whose saved page text may hold their own promotion lines.
+    BOARDS_WITH_PROMOTION = {"jaabz", "relocateme"}
+
+    @classmethod
+    def clean_description(cls, value, site):
+        text = cls.clean_text(value)
+
+        if text and str(site) in cls.BOARDS_WITH_PROMOTION:
+            from sources.jsonld import remove_site_promotion
+
+            text = remove_site_promotion(text) or None
+
+        return text
+
     @staticmethod
     def clean_skills(value):
         """

@@ -76,6 +76,8 @@ class Job:
 
     search_term: Optional[str] = None
     found_on: Optional[str] = None       # every site the job was seen on
+    country: Optional[str] = None        # key from countries.py ("uae"), None = other
+    source_hint: Optional[str] = None    # what the board itself says: "visa", "relocation"
 
 
     match_score: Optional[float] = None
@@ -116,6 +118,11 @@ class Job:
     german_level_required: Optional[str] = None
     german_level_value: Optional[int] = None
     german_evidence: Optional[str] = None
+    # Other languages the listing asks for: {"Arabic": {"requirement":
+    # "required", "level_value": 5, "evidence": "..."}}
+    other_languages: dict = field(default_factory=dict)
+    local_hire: Optional[str] = None     # nationals_only | in_country_only | preferred | None
+    local_hire_evidence: Optional[str] = None
     english_working_language: Optional[bool] = None
 
     visa_sponsorship_status: Optional[str] = None  # yes | no | mixed | unknown

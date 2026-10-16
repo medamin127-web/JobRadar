@@ -170,7 +170,7 @@ LEVEL_KEYWORDS = [
     (re.compile(r"native|muttersprach|mother tongue", re.I), 6),
     (
         re.compile(
-            r"fluen\w*|fließend\w*|fliessend\w*|verhandlungssicher\w*|business[- ]fluent"
+            r"fluen\w*|fließend\w*|fliessend\w*|verhandlungssicher\w*|business[- ]fluent|bilingual"
             r"|excellent|exzellent|ausgezeichnet\w*|perfekt|proficien\w*"
             r"|advanced|fortgeschritten\w*"
             r"|sehr hohe[nm]?\s+niveau|hohe[nm]?\s+niveau|\bc[- ]niveau|high level",
@@ -211,7 +211,9 @@ OTHER_LANGUAGE = re.compile(
 )
 
 
-def _nearest_level(window: str, anchor_start: int, anchor_end: int) -> Optional[int]:
+def _nearest_level(
+    window: str, anchor_start: int, anchor_end: int, other=None
+) -> Optional[int]:
     """
     Find the level that belongs to the German term.
 
@@ -221,19 +223,21 @@ def _nearest_level(window: str, anchor_start: int, anchor_end: int) -> Optional[
     - Overlapping keywords ("sehr gute" vs "gute") keep the longest.
     """
 
+    other = other or OTHER_LANGUAGE
+
     def usable(start: int, end: int) -> bool:
         if end <= anchor_start:
             between = window[end:anchor_start]
         else:
             between = window[anchor_end:start]
 
-        if not OTHER_LANGUAGE.search(between):
+        if not other.search(between):
             return True
 
         # "Fluent English and German" / "German and English at C1":
         # the level is shared when only languages and filler words sit
         # between the level and the German term.
-        leftover = OTHER_LANGUAGE.sub(" ", between)
+        leftover = other.sub(" ", between)
         words = re.findall(r"[a-zäöüß]+", leftover.lower())
 
         return all(word in SHARED_FILLER for word in words)
@@ -472,6 +476,22 @@ SUPPORT_VISA = re.compile(
     re.IGNORECASE,
 )
 
+# Gulf wording: the employer gives the visa as part of the package.
+#   "Employment visa will be provided", "Company-sponsored residence visa",
+#   "Benefits: Visa, medical insurance, annual air ticket"
+VISA_PROVIDED = re.compile(
+    r"(?:employment|work|residence|residency|working)\s+visas?\W+(?:\w+\W+){0,3}"
+    r"(?:provided|sponsored|included|covered|arranged|processed|paid)"
+    r"|(?:company|employer)[- ](?:sponsored|provided|paid)\s+(?:\w+\s+){0,2}visas?"
+    r"|visas?\s+(?:will be\s+|is\s+|are\s+)?(?:provided|sponsored|arranged|covered|processed)"
+    r"\s+by\s+(?:the\s+)?(?:company|employer|us)"
+    r"|(?:company|employer|we)\s+(?:will\s+)?(?:provides?|sponsors?|arranges?|issues?)\s+(?:the\s+|your\s+)?"
+    r"(?:employment\s+|work\s+|residence\s+|residency\s+)?visas?"
+    r"|\bvisas?\s*(?:,|\+|&|and)\s*(?:medical|health|insurance|flights?|air|tickets?|accommodation)"
+    r"|(?:medical|health insurance|tickets?|accommodation)\s*(?:,|\+|&|and)\s*(?:employment\s+|residence\s+)?visas?\b",
+    re.IGNORECASE,
+)
+
 # "You must already have the right to work..." style requirements.
 # Deliberately narrow: a sentence only counts when it states a
 # REQUIREMENT. Mentioning nationality or citizenship in an
@@ -568,6 +588,7 @@ def analyze_visa(text: str) -> dict:
         positive = (
             (SPONSOR_TERM.search(sentence) and POSITIVE_VERBS.search(sentence))
             or SUPPORT_VISA.search(sentence)
+            or VISA_PROVIDED.search(sentence)
         )
 
         if positive:
@@ -798,6 +819,248 @@ def extract_salary_hint(job: Job) -> Optional[float]:
 
 
 # ==================================================
+# OTHER LANGUAGES (Arabic, Dutch, French...)
+# ==================================================
+
+# German has its own, finer analysis above. These use a simpler one:
+# required (with a level) / optional / not required.
+
+_NOT_A_LANGUAGE = (
+    r"(?!\W+(?:law|laws|market\w*|compan\w+|clients?|customers?|government"
+    r"|nationals?|citizens?|nationality|content|localization|localisation"
+    r"|rtl|nlp|text|fonts?|interfaces?|ui|websites?|apps?|version|speaking market"
+    r"|cuisine|food|team|office|entity|subsidiary|tech|riviera|alps)\b)"
+)
+
+LANGUAGE_TERMS = {
+    "Arabic": r"\barabic\b|\barabisch\b|العربية|عربي",
+    "French": r"\bfrench\b|\bfrançais\b|\bfrancais\b|französisch",
+    "Dutch": r"\bdutch\b|\bnederlands\b|niederländisch",
+    "Spanish": r"\bspanish\b|\bespañol\b|\bespanol\b|spanisch",
+    "Italian": r"\bitalian\b|\bitaliano\b|italienisch",
+    "Portuguese": r"\bportuguese\b|\bportuguês\b",
+    "Swedish": r"\bswedish\b|\bsvenska\b",
+    "Danish": r"\bdanish\b|\bdansk\b",
+    "Norwegian": r"\bnorwegian\b|\bnorsk\b",
+    "Finnish": r"\bfinnish\b|\bsuomi\b",
+    "Turkish": r"\bturkish\b|\btürkçe\b",
+    "Russian": r"\brussian\b",
+    "Hindi": r"\bhindi\b",
+    "Urdu": r"\burdu\b",
+    "Japanese": r"\bjapanese\b",
+    "Mandarin": r"\bmandarin\b|\bchinese\b",
+    "Korean": r"\bkorean\b",
+    "Hebrew": r"\bhebrew\b",
+}
+
+LANGUAGE_PATTERNS = {
+    name: re.compile("(?:" + term + ")" + _NOT_A_LANGUAGE, re.IGNORECASE)
+    for name, term in LANGUAGE_TERMS.items()
+}
+
+# Every language name (German and English included): a level separated
+# from the language by another language does not belong to it.
+ANY_LANGUAGE = re.compile(
+    "|".join(LANGUAGE_TERMS.values())
+    + r"|\benglish\b|\benglisch\b|\bgerman\b|\bdeutsch\w*",
+    re.IGNORECASE,
+)
+
+LANGUAGE_CUES = re.compile(
+    r"speak|speaker|speaking|fluen|proficien|native|mother tongue|bilingual"
+    r"|language|written|spoken|verbal|communication|command of|knowledge of"
+    r"|\blevel\b|\b[abc][12]\b|skills?\b|kenntnis|sprach"
+    r"|إجادة|يشترط|مطلوب|طلاقة|اللغة",
+    re.IGNORECASE,
+)
+
+LANGUAGE_REQUIRED_CUES = re.compile(
+    r"\bmust\b|required|mandatory|essential|necessary|\bneed|fluen|proficien"
+    r"|native|mother tongue|bilingual|excellent|strong|good|\b[abc][12]\b"
+    r"|erforderlich|vorausgesetzt|يشترط|مطلوب|إجادة|طلاقة",
+    re.IGNORECASE,
+)
+
+LANGUAGE_OPTIONAL_CUES = re.compile(
+    r"\bplus\b|nice[- ]to[- ]have|advantage\w*|beneficial|bonus|desirable"
+    r"|preferred|preferabl\w+|ideally|\basset\b|would be great|helpful"
+    r"|appreciated|encouraged|optional|von vorteil|wünschenswert",
+    re.IGNORECASE,
+)
+
+LANGUAGE_NOT_REQUIRED = re.compile(
+    r"(?:is |are )?not (?:required|needed|necessary|mandatory|a requirement)"
+    r"|\bno\s+$|\bwithout\s+$",
+    re.IGNORECASE,
+)
+
+# Used when a listing requires a language but names no level.
+DEFAULT_LANGUAGE_LEVEL = 4  # B2
+
+_RANK = {"required": 3, "not_required": 2, "optional": 1}
+
+
+def analyze_other_languages(text: str) -> dict:
+    """
+    -> {"Arabic": {"requirement": "required", "level_value": 5,
+                   "evidence": "..."}, ...}
+    Only languages the listing actually talks about as languages.
+    """
+
+    found = {}
+
+    for sentence in split_sentences(text):
+        for name, pattern in LANGUAGE_PATTERNS.items():
+            for match in pattern.finditer(sentence):
+                window, offset = _window(sentence, match)
+
+                clause = _clause(sentence, match)
+                after = sentence[match.end(): match.end() + 40]
+
+                # "Arabic content", "French clients" are not about the
+                # language; "Dutch is a plus" is, even without a cue word.
+                if not (
+                    LANGUAGE_CUES.search(window)
+                    or LANGUAGE_OPTIONAL_CUES.search(after[:30])
+                    or LANGUAGE_NOT_REQUIRED.match(after.strip())
+                ):
+                    continue
+
+                before = sentence[max(0, match.start() - 12): match.start()]
+
+                if LANGUAGE_NOT_REQUIRED.match(after.strip()) or LANGUAGE_NOT_REQUIRED.search(before):
+                    result = ("not_required", None)
+                elif LANGUAGE_OPTIONAL_CUES.search(clause):
+                    result = ("optional", None)
+                elif LANGUAGE_REQUIRED_CUES.search(window):
+                    level = _nearest_level(
+                        window,
+                        match.start() - offset,
+                        match.end() - offset,
+                        other=ANY_LANGUAGE,
+                    )
+                    result = ("required", level or DEFAULT_LANGUAGE_LEVEL)
+                else:
+                    continue
+
+                current = found.get(name)
+                better = current is None or (
+                    _RANK[result[0]] > _RANK[current["requirement"]]
+                    or (
+                        result[0] == current["requirement"] == "required"
+                        and result[1] > current["level_value"]
+                    )
+                )
+
+                if better:
+                    found[name] = {
+                        "requirement": result[0],
+                        "level_value": result[1],
+                        "evidence": snippet(sentence),
+                    }
+
+    return found
+
+
+# ==================================================
+# LOCAL HIRING ONLY (mostly Gulf)
+# ==================================================
+
+_GULF_PEOPLE = (
+    r"(?:uae|emirati|saudi|qatari|kuwaiti|omani|bahraini|gcc|local)"
+)
+_GULF_PLACES = (
+    r"(?:the\s+)?(?:uae|u\.a\.e\.?|united arab emirates|dubai|abu dhabi|sharjah"
+    r"|saudi arabia|ksa|the kingdom|riyadh|jeddah|dammam|khobar|qatar|doha"
+    r"|kuwait|oman|muscat|bahrain|manama|gcc|middle east)"
+)
+
+NATIONALS_ONLY = compile_all([
+    _GULF_PEOPLE + r"\s+nationals?\s+only",
+    r"(?:only|exclusively)\s+(?:for\s+|open to\s+)?" + _GULF_PEOPLE + r"\s+(?:nationals?|citizens?)",
+    r"(?:open|available|restricted|limited)\s+(?:only\s+)?to\s+" + _GULF_PEOPLE + r"\s+(?:nationals?|citizens?)",
+    r"must be (?:a |an )?" + _GULF_PEOPLE + r"\s+(?:nationals?|citizens?)",
+    r"\bemiratis?\s+only|(?:uae|saudi|qatari|kuwaiti|omani|bahraini)\s+nationality\s+(?:is\s+)?(?:required|only|mandatory)",
+    r"(?:emiratisation|emiratization|saudization|saudisation|qatarization|qatarisation"
+    r"|omanization|omanisation|kuwaitization|bahrainization)\s+(?:role|position|job|vacancy|opportunit\w+|only|program\w*\s+(?:role|position|vacancy))",
+    r"للمواطنين فقط|للسعوديين فقط|سعوديين فقط|للإماراتيين|للقطريين",
+])
+
+NATIONALS_PREFERRED = re.compile(
+    _GULF_PEOPLE + r"\s+(?:nationals?|citizens?)\s+(?:\w+\s+){0,2}(?:preferred|encouraged|prioriti[sz]ed|first)"
+    r"|(?:preference|priority)\s+(?:\w+\s+){0,3}" + _GULF_PEOPLE + r"\s+(?:nationals?|citizens?)",
+    re.IGNORECASE,
+)
+
+IN_COUNTRY_ONLY = compile_all([
+    r"(?:candidates?|applicants?|only)\s+(?:\w+\s+){0,3}(?:currently\s+)?(?:based|residing|living|located|present)\s+in\s+"
+    + _GULF_PLACES + r"\W+(?:\w+\W+){0,2}(?:only|can apply|will be considered|need apply)",
+    r"(?:must|should)\s+(?:\w+\s+){0,2}currently\s+(?:be\s+)?(?:based|residing|living|located|present)\s+in\s+" + _GULF_PLACES,
+    r"\bin[- ]country\s+(?:candidates?|applicants?|hires?|only)",
+    r"\blocal\s+(?:candidates?|applicants?|hires?)\s+only|only\s+local\s+(?:candidates?|applicants?)",
+    r"transferr?able\s+(?:iqama|visa|residence)",
+    r"(?:own|valid)\s+(?:\w+\s+){0,2}(?:iqama|residence visa|residency visa|uae visa|qatar id|qid)",
+    r"(?:husband|father|family|spouse|parents?)'?s?\s+(?:visa|sponsorship)",
+    r"visit visa (?:holders?|candidates?)",
+    r"(?:no|without)\s+visa\s+(?:sponsorship|processing|provided)\s+(?:\w+\s+){0,3}(?:in|within|for)\s+" + _GULF_PLACES,
+])
+
+IN_COUNTRY_PREFERRED = re.compile(
+    r"(?:candidates?|applicants?)\s+(?:\w+\s+){0,3}(?:currently\s+)?(?:based|residing|living|located)\s+in\s+"
+    + _GULF_PLACES + r"\W+(?:\w+\W+){0,3}(?:preferred|preference|advantage|plus|priority)"
+    r"|(?:must|should)\s+be\s+(?:based|residing|living|located)\s+in\s+" + _GULF_PLACES
+    + r"|immediate joiners?",
+    re.IGNORECASE,
+)
+
+RELOCATION_WORDS = re.compile(r"relocat\w+|willing to move|move to", re.IGNORECASE)
+
+
+# In a title, naming the nationality is enough:
+#   "Full Stack Development & UX Design – Onsite-KSA_Saudi Nationals"
+NATIONALS_IN_TITLE = re.compile(
+    r"(?:saudi|emirati|uae|qatari|kuwaiti|omani|bahraini)[\s_\-]*nationals?\b"
+    r"|(?:saudi|emirati|qatari|kuwaiti|omani|bahraini)[\s_\-]*nation\b"
+    r"|\b(?:saudization|saudisation|emiratisation|emiratization|qatarization)\b"
+    r"|\bemiratis? only\b",
+    re.IGNORECASE,
+)
+
+
+def analyze_local_hire(text: str, title: str = "") -> dict:
+    """
+    -> local_hire: nationals_only | in_country_only | preferred | None
+       local_hire_evidence
+    """
+
+    if title and NATIONALS_IN_TITLE.search(title):
+        return {"local_hire": "nationals_only", "local_hire_evidence": f"Title: {title}"}
+
+    preferred = None
+
+    for sentence in split_sentences(text):
+        if first_match(NATIONALS_ONLY, sentence):
+            return {"local_hire": "nationals_only", "local_hire_evidence": snippet(sentence)}
+
+        # "must be based in Dubai or willing to relocate" is not local only.
+        if RELOCATION_WORDS.search(sentence):
+            continue
+
+        if first_match(IN_COUNTRY_ONLY, sentence):
+            return {"local_hire": "in_country_only", "local_hire_evidence": snippet(sentence)}
+
+        if not preferred and (
+            NATIONALS_PREFERRED.search(sentence) or IN_COUNTRY_PREFERRED.search(sentence)
+        ):
+            preferred = sentence
+
+    if preferred:
+        return {"local_hire": "preferred", "local_hire_evidence": snippet(preferred)}
+
+    return {"local_hire": None, "local_hire_evidence": None}
+
+
+# ==================================================
 # PUBLIC ENTRY POINT
 # ==================================================
 
@@ -817,6 +1080,8 @@ class EligibilityAnalyzer:
                 "german_level_required": None,
                 "german_level_value": None,
                 "german_evidence": None,
+                "other_languages": {},
+                **analyze_local_hire("", job.title or ""),
                 "english_working_language": False,
                 "visa_status": "unknown",
                 "visa_evidence": "No job description available.",
@@ -849,6 +1114,8 @@ class EligibilityAnalyzer:
             "german_level_required": level_label(german["level_value"]),
             "german_level_value": german["level_value"],
             "german_evidence": german["evidence"],
+            "other_languages": analyze_other_languages(text),
+            **analyze_local_hire(text, job.title or ""),
             "english_working_language": bool(
                 ENGLISH_WORKING_LANGUAGE.search(text)
             ),
@@ -871,6 +1138,9 @@ class EligibilityAnalyzer:
         job.german_level_required = signals["german_level_required"]
         job.german_level_value = signals["german_level_value"]
         job.german_evidence = signals["german_evidence"]
+        job.other_languages = signals["other_languages"]
+        job.local_hire = signals["local_hire"]
+        job.local_hire_evidence = signals["local_hire_evidence"]
         job.english_working_language = signals["english_working_language"]
 
         job.visa_sponsorship_status = signals["visa_status"]

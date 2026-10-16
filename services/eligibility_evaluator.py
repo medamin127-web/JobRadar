@@ -6,6 +6,8 @@ Design rule: eligibility is a GATE, not another weighted score.
 A perfect technical match you cannot legally take is a "skip".
 """
 
+from countries import profile_of
+from sources.relevance import is_tech_title
 from models import Job, Profile
 
 
@@ -77,6 +79,42 @@ class EligibilityEvaluator:
         if relocation == "yes":
             positives.append("RELOCATION_SUPPORT")
 
+        # What the job board itself says (Jaabz lists visa jobs only).
+        # Weaker than the listing's own words, so only a "maybe".
+        board_visa = job.source_hint == "visa" and visa == "unknown"
+        board_relocation = job.source_hint == "relocation" and relocation == "unknown"
+
+        if board_visa:
+            positives.append("BOARD_LISTS_IT_AS_VISA_SPONSORED")
+
+        if board_relocation:
+            positives.append("BOARD_LISTS_IT_WITH_RELOCATION")
+
+        # ---------------- Local hiring (mostly Gulf) ----------------
+
+        if job.local_hire == "nationals_only":
+            blockers.append("NATIONALS_ONLY")
+        elif job.local_hire == "in_country_only":
+            if sponsored:
+                warnings.append("LOCAL_CANDIDATES_MENTIONED")
+            else:
+                blockers.append("LOCAL_CANDIDATES_ONLY")
+        elif job.local_hire == "preferred":
+            warnings.append("LOCAL_CANDIDATES_PREFERRED")
+
+        # In the Gulf the employer normally arranges the work visa, so a
+        # silent listing there is a cautious maybe (in Germany it is not).
+        country = profile_of(job.country)
+        employer_visa_norm = (
+            country is not None
+            and country.get("visa_norm") == "employer_sponsored"
+            and visa == "unknown"
+            and job.local_hire is None
+        )
+
+        if employer_visa_norm:
+            positives.append("EMPLOYER_VISA_IS_THE_NORM_THERE")
+
         # ---------------- Remote ----------------
 
         worldwide_remote = (
@@ -132,6 +170,29 @@ class EligibilityEvaluator:
         elif requirement in ("optional", "not_required"):
             positives.append("GERMAN_NOT_REQUIRED")
 
+        # ---------------- Other languages (Arabic, Dutch...) ----------------
+
+        for name, info in (job.other_languages or {}).items():
+            flag = name.upper()
+            yours = profile.language_level_value(name) or 0
+            needs = info.get("requirement")
+
+            if needs == "required":
+                gap = (info.get("level_value") or 4) - yours
+
+                if gap >= 2:
+                    blockers.append(f"{flag}_REQUIRED")
+                elif gap == 1:
+                    warnings.append(f"{flag}_LEVEL_STRETCH")
+                else:
+                    positives.append(f"{flag}_REQUIRED_YOU_HAVE_IT")
+
+            elif needs == "optional" and yours >= 4:
+                positives.append(f"{flag}_IS_A_PLUS_YOU_HAVE_IT")
+
+            elif needs == "not_required":
+                positives.append(f"{flag}_NOT_REQUIRED")
+
         if job.english_working_language:
             positives.append("ENGLISH_WORKING_LANGUAGE")
 
@@ -162,6 +223,9 @@ class EligibilityEvaluator:
             medium = (
                 relocation == "yes"
                 or visa == "maybe"
+                or board_visa
+                or board_relocation
+                or employer_visa_norm
                 or job.international_friendly
                 or job.english_working_language
                 or (
@@ -208,6 +272,16 @@ class ApplicationBucketer:
         if status == "blocked":
             bucket = "skip"
             reason = "Blocked: " + ", ".join(job.eligibility_blockers)
+
+        elif (
+            job.title
+            and not is_tech_title(job.title)
+            and (job.role_match_score or 0) < 50
+        ):
+            # Search sites (Indeed UAE above all) also return jobs like
+            # "Interior Designer" or "Planning Engineer".
+            bucket = "skip"
+            reason = "Not a software role (by its title)."
 
         elif category == "low_priority":
             bucket = "skip"
@@ -296,7 +370,7 @@ class ApplicationBucketer:
 
         elif status == "unlikely":
             bucket = "long_shot" if category == "good_target" else "skip"
-            reason = "Probably needs German or unsupported work authorization."
+            reason = "Probably needs German or a work permit you do not have."
 
         else:
             bucket = "review"

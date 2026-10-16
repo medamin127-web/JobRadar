@@ -8,58 +8,34 @@ Edit this file to change searches. Nothing here runs anything.
 # SEARCHES
 # ==================================================
 
-SEARCH_CONFIGS = [
-    {
-        "location": "Germany",
+from countries import search_configs
 
-        # Country name Indeed/Glassdoor expect.
-        "indeed_country": "germany",
+# Countries to search, from the profiles in countries.py. Ready there:
+#   germany, uae, saudi_arabia, qatar, kuwait, oman, bahrain
+COUNTRIES = ["saudi_arabia", "qatar", "germany", "uae"]
 
-        # A feed job (Arbeitnow, company career pages) is kept only when its
-        # location contains one of these words.
-        "location_keywords": [
-            "germany", "deutschland", "berlin", "munich", "münchen", "hamburg",
-            "cologne", "köln", "frankfurt", "düsseldorf", "dusseldorf",
-            "stuttgart", "leipzig", "dresden", "hannover", "hanover",
-            "nuremberg", "nürnberg", "bremen", "essen", "dortmund", "bonn",
-            "karlsruhe", "mannheim", "heidelberg", "potsdam", "aachen",
-        ],
+# Countries you prefer. Priority 2 = searched about twice as often as the
+# others, and their jobs rank a little higher (+5 points) inside the same
+# bucket. Countries not listed have priority 1.
+COUNTRY_PRIORITY = {"saudi_arabia": 2, "qatar": 2}
 
-        "search_terms": [
-            "Full Stack Developer",
-            "Full Stack Engineer",
-            "Software Engineer",
-            "Web Developer",
+# LinkedIn refuses requests (HTTP 429) when one run makes too many
+# searches. So each run searches only this many countries: the ones most
+# overdue (time since their last search x their priority). The ranking always shows every country.
+# 0 = all countries every run.  Override once with:
+#   python scraper.py --countries uae,qatar
+COUNTRIES_PER_RUN = 2
 
-            # Targeted searches for international applicants
-            "Software Engineer visa sponsorship",
-            "Developer visa sponsorship",
-            "Software Engineer relocation",
-            "Developer relocation Germany",
-            "Software Engineer EU Blue Card",
-        ],
-    },
-
-    # Later:
-    #
-    # {
-    #     "location": "Netherlands",
-    #     "search_terms": [
-    #         "Full Stack Developer",
-    #         "Full Stack Engineer",
-    #         "Software Engineer",
-    #         "Web Developer",
-    #     ],
-    # },
-]
+SEARCH_CONFIGS = search_configs(COUNTRIES, COUNTRY_PRIORITY)
 
 # ==================================================
 # SOURCES
 # ==================================================
 
-# Search sites, through JobSpy (each one runs every search term).
-# Possible: "linkedin", "indeed", "glassdoor", "google".
-SITES = ["linkedin", "indeed"]
+# Search sites, through JobSpy. A site runs only in the countries whose
+# profile lists it (Bayt is Gulf only). Possible: "linkedin", "indeed",
+# "bayt", "glassdoor", "google".
+SITES = ["linkedin", "indeed", "bayt"]
 
 # Arbeitnow: a German job board with a free API (no search: JobRadar reads
 # its newest pages and keeps the tech jobs).
@@ -67,9 +43,20 @@ ARBEITNOW_PAGES = 5          # 0 = off
 
 # Company career pages. Add a company's Greenhouse token or Lever name
 # (from its careers URL) and check it first with:  python sources_check.py
-GREENHOUSE_BOARDS = ["n26", "getyourguide", "hellofresh", "celonis", "contentful",
-                     "sumup", "traderepublic", "raisin", "commercetools", "solarisbank"]      
+GREENHOUSE_BOARDS = [         # e.g. ["n26"]
+    "n26", "getyourguide", "hellofresh", "celonis", "contentful", "sumup",
+    "traderepublic", "raisin", "commercetools", "solarisbank",
+]
 LEVER_COMPANIES = []         # e.g. ["somecompany"]
+
+# Jaabz (jaabz.com): jobs with visa sponsorship. JobRadar reads its list
+# for each of your countries (up to this many pages each, one request per
+# new tech job). 0 = off.
+JAABZ_PAGES = 2
+
+# Relocate.me: jobs that all come with a relocation package (visa help,
+# flight, moving money). Small board, mostly Europe. 0 = off.
+RELOCATEME_PAGES = 5
 
 RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72

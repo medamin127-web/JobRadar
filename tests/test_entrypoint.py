@@ -58,10 +58,11 @@ class TestMain(unittest.TestCase):
         scraper.load_profile = make_profile
         scraper.build_source = lambda site: FakeSource()
         scraper.SEARCH_CONFIGS = [
-            {"location": "Testland", "search_terms": ["Software Engineer"]}
+            {"key": "testland", "name": "Testland", "location": "Testland",
+             "search_terms": ["Software Engineer"]}
         ]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
-        scraper.build_feeds = lambda: []
+        scraper.build_feeds = lambda known_ids=(): []
         scraper.SITES = ["linkedin"]
 
         with tempfile.TemporaryDirectory() as directory:
@@ -104,9 +105,11 @@ class TestDatabaseRuns(unittest.TestCase):
                          scraper.SEARCH_CONFIGS, scraper.DELAY_BETWEEN_SEARCHES,
                          scraper.build_feeds, scraper.SITES)
         scraper.load_profile = make_profile
-        scraper.SEARCH_CONFIGS = [{"location": "Testland", "search_terms": ["Dev"]}]
+        scraper.SEARCH_CONFIGS = [
+            {"key": "testland", "name": "Testland", "location": "Testland", "search_terms": ["Dev"]}
+        ]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
-        scraper.build_feeds = lambda: []
+        scraper.build_feeds = lambda known_ids=(): []
         scraper.SITES = ["linkedin"]
 
         self.original_cwd = os.getcwd()

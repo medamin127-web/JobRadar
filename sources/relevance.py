@@ -22,12 +22,15 @@ NOT_TECH = re.compile(
     r"|\bintern\b|internship|praktik|werkstudent|working student|ausbildung"
     r"|business development|sales|representative|recruit|marketing"
     r"|\bmanager\b|\bdirector\b|head of|account executive"
-    r"|recipe|value engineer|pre-?sales|customer success",
+    r"|recipe|value engineer|pre-?sales|customer success"
+    r"|planning engineer|site engineer|commissioning|draftsman|draughtsman"
+    r"|interior|landscap|timekeeper|\bhvac\b|\bmep\b|surveyor|estimator"
+    r"|technician|\bit support\b|helpdesk|help desk",
     re.IGNORECASE,
 )
 
 # Sources that return jobs from everywhere (not a search in one country).
-FEED_SITES = {"arbeitnow", "greenhouse", "lever"}
+FEED_SITES = {"arbeitnow", "greenhouse", "lever", "jaabz", "relocateme"}
 
 # A remote feed job is kept only when its location is just "remote" (or a
 # region that includes your countries), not "Remote, Netherlands" or
@@ -44,20 +47,35 @@ def is_tech_title(title) -> bool:
     return bool(TECH_TITLE.search(title)) and not NOT_TECH.search(title)
 
 
+def has_keyword(text, keywords) -> bool:
+    """
+    True when one of the keywords appears in the text as a whole word:
+    "Oman" is in "Muscat, Oman" but not in "Romania".
+    """
+
+    text = str(text or "").lower()
+
+    return any(
+        re.search(r"(?<![a-zäöüß])" + re.escape(keyword.lower()) + r"(?![a-zäöüß])", text)
+        for keyword in keywords
+    )
+
+
 def in_country(location, keywords) -> bool:
     """True when the location names the country or one of its cities."""
 
-    location = str(location or "").lower()
-    return any(keyword.lower() in location for keyword in keywords)
+    return has_keyword(location, keywords)
 
 
 def in_target_countries(frame, configs):
     """
     Boolean mask: which jobs belong to the countries you search.
 
-    Search sites (LinkedIn, Indeed) were already searched by country, so
-    their jobs always count. Feed jobs count when their location names one
-    of your countries/cities, or when they are remote.
+    Search sites (LinkedIn, Indeed, Bayt) were searched by country: their
+    jobs count when that country is still in your list (older jobs without
+    a search_country were Germany searches and always count). Feed jobs
+    count when their location names one of your countries/cities, or when
+    they are remote.
     """
 
     import pandas as pd
@@ -74,10 +92,19 @@ def in_target_countries(frame, configs):
         else pd.Series([False] * len(frame), index=frame.index)
     )
 
+    keys = {config.get("key") for config in configs}
+    searched = (
+        frame["search_country"].map(
+            lambda key: not isinstance(key, str) or not key or key in keys
+        )
+        if "search_country" in frame.columns
+        else pd.Series([True] * len(frame), index=frame.index)
+    )
+
     from_feed = sites.isin(FEED_SITES)
     located = locations.map(lambda loc: in_country(loc, keywords))
     generic_remote = remote & locations.map(
         lambda loc: not str(loc or "").strip() or bool(GENERIC_REMOTE.match(str(loc)))
     )
 
-    return ~from_feed | located | generic_remote
+    return (~from_feed & searched) | located | generic_remote

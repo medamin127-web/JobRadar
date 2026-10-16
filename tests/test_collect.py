@@ -133,6 +133,32 @@ class TestRateLimitWatcher(unittest.TestCase):
         log(logging.ERROR, "LinkedIn response status code 429")
         self.assertTrue(watcher.search_blocked)
 
+    def test_bayt_403_counts_as_refused(self):
+        import importlib
+        import logging
+        import sys
+        import types
+
+        fake = types.ModuleType("jobspy")
+        fake.scrape_jobs = None
+        sys.modules.setdefault("jobspy", fake)
+
+        module = importlib.import_module("sources.jobspy_source")
+        watcher = module._RateLimitWatcher()
+
+        def log(message):
+            watcher.handle(logging.LogRecord("JobSpy:Bayt", logging.WARNING, "", 0, message, None, None))
+
+        log("Bayt response status code 403 for job 5123456")
+        self.assertEqual(watcher.description_failures, 1)
+        self.assertFalse(watcher.search_blocked)
+
+        log("Bayt response status code 4030")   # not a status code
+        self.assertFalse(watcher.search_blocked)
+
+        log("Bayt response status code 403")
+        self.assertTrue(watcher.search_blocked)
+
 
 if __name__ == "__main__":
     unittest.main()

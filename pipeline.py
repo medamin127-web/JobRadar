@@ -27,6 +27,7 @@ from services.experience_matcher import ExperienceMatcher
 from services.match_scorer import MatchScorer
 from services.seniority_matcher import SeniorityMatcher
 from services.target_classifier import TargetClassifier
+from countries import country_of_location
 from sources.relevance import in_target_countries, is_tech_title
 
 
@@ -55,6 +56,9 @@ FRONT_COLUMNS = [
     "relocation_support",
     "german_requirement",
     "german_level_required",
+    "other_languages",
+    "local_hire",
+    "country",
     "work_mode",
     "remote_scope",
     "job_url",
@@ -196,6 +200,10 @@ def collect_jobs(
                     )
 
             if not scraped.empty:
+                # Remember which country search found the job.
+                if config.get("key"):
+                    scraped = scraped.assign(search_country=config["key"])
+
                 all_jobs.append(scraped)
 
         if refused_in_a_row >= stop_after_rate_limited:
@@ -223,6 +231,34 @@ def collect_jobs(
             )
 
     return jobs
+
+
+def assign_countries(jobs: pd.DataFrame, configs) -> pd.DataFrame:
+    """
+    Add a "country" column (a key from countries.py, or None): the country
+    search that found the job, else the country its location names.
+    """
+
+    if jobs.empty:
+        return jobs
+
+    searched = (
+        jobs["search_country"]
+        if "search_country" in jobs.columns
+        else pd.Series([None] * len(jobs), index=jobs.index)
+    )
+    locations = (
+        jobs["location"]
+        if "location" in jobs.columns
+        else pd.Series([None] * len(jobs), index=jobs.index)
+    )
+
+    countries = [
+        key if isinstance(key, str) and key else country_of_location(location, configs)
+        for key, location in zip(searched, locations)
+    ]
+
+    return jobs.assign(country=countries)
 
 
 # ==================================================
@@ -405,14 +441,28 @@ VISA_RANK = {
 }
 
 
-def sort_jobs(job_objects) -> None:
-    """Bucket first, then visa evidence, then score (penalized for missing data)."""
+# Points added (for sorting only) per priority step above 1: a job in a
+# priority-2 country ranks as if it scored 5 points more.
+PRIORITY_BONUS = 5
+
+
+def sort_jobs(job_objects, priorities=None) -> None:
+    """
+    Bucket first, then visa evidence, then score (penalized for missing
+    data, plus a small bonus for the countries you prefer).
+    """
+
+    priorities = priorities or {}
+
+    def score(job):
+        base = job.ranking_score if job.ranking_score is not None else 0
+        return base + PRIORITY_BONUS * (priorities.get(job.country, 1) - 1)
 
     job_objects.sort(
         key=lambda job: (
             BUCKET_ORDER.get(job.application_bucket, 9),
             VISA_RANK.get(job.visa_sponsorship_status, 2),
-            -(job.ranking_score if job.ranking_score is not None else 0),
+            -score(job),
             -CONFIDENCE_RANK.get(job.confidence, 0),
         )
     )
@@ -422,7 +472,7 @@ def sort_jobs(job_objects) -> None:
 # 6. EVERYTHING AFTER COLLECTING
 # ==================================================
 
-def process_jobs(jobs: pd.DataFrame, profile) -> list:
+def process_jobs(jobs: pd.DataFrame, profile, priorities=None) -> list:
     """Raw DataFrame -> sorted list of fully analyzed Job objects."""
 
     jobs = deduplicate(jobs)
@@ -433,7 +483,7 @@ def process_jobs(jobs: pd.DataFrame, profile) -> list:
 
     analyze_jobs(job_objects)
     score_jobs(job_objects, profile)
-    sort_jobs(job_objects)
+    sort_jobs(job_objects, priorities)
 
     return job_objects
 
@@ -484,6 +534,9 @@ def jobs_to_frame(job_objects) -> pd.DataFrame:
     if not job_objects:
         return pd.DataFrame()
 
-    return order_columns(
-        pd.DataFrame([job.to_dict() for job in job_objects])
-    )
+    from reporting import languages_text
+
+    frame = pd.DataFrame([job.to_dict() for job in job_objects])
+    frame["other_languages"] = [languages_text(job) for job in job_objects]
+
+    return order_columns(frame)

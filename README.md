@@ -1,8 +1,8 @@
 # JobRadar
 
 Personal international job search engine. It collects tech jobs from several
-sources (LinkedIn, Indeed, Arbeitnow, company career pages; Germany for now),
-scores them against my profile, and checks whether I can realistically take
+sources (LinkedIn, Indeed, Bayt, Arbeitnow, Jaabz, company career pages) in
+several countries (Germany and the Gulf for now), scores them against my profile, and checks whether I can realistically take
 them from Tunisia (visa, relocation, language, remote scope).
 
 ## Setup (Windows PowerShell, Python 3.12)
@@ -46,8 +46,10 @@ git commit -m "JobRadar phase 0"
 # 1. Run the tests (should end with OK)
 python -m unittest discover -s tests -t .
 
-# 2. Scrape LinkedIn, save to the database, then score and rank
-python scraper.py
+# 2. Scrape, save to the database, then score and rank
+python scraper.py                        # the countries whose turn it is
+python scraper.py --countries uae,qatar  # these countries this time
+python scraper.py --all-countries        # every country (many searches!)
 
 # 3. No scraping: rank what is already in the database
 #    (after editing candidate_profile.py or the code, or while LinkedIn
@@ -68,6 +70,33 @@ in `config.py`) that you have not marked. Jobs found for the first time are
 marked **NEW**. The id to use with `track.py` is shown at the end of each
 ranking line (`id 4477572741`); the last 6 digits are enough.
 
+### Countries
+
+`COUNTRIES` in `config.py` lists the countries to search. Each one has a
+profile in `countries.py`: the search location, the search terms, which
+sites make sense there (Bayt is Gulf only), the city names used to place
+feed jobs, the local language, and how visas usually work there:
+
+- **explicit** (Germany): an ad that says nothing about visas is not counted
+  as visa support.
+- **employer_sponsored** (UAE, Saudi Arabia, Qatar, Kuwait, Oman, Bahrain):
+  the employer normally arranges the work visa, so a silent ad is a cautious
+  "possible". Ads for nationals only (UAE nationals, Emiratisation,
+  Saudization roles) or for people already in the country (transferable
+  iqama, own residence visa, "currently residing in the UAE") are blocked.
+
+**Countries take turns.** LinkedIn refuses requests when one run makes too
+many searches, so each run searches `COUNTRIES_PER_RUN` countries (the most
+overdue ones) and says which ones come next. `COUNTRY_PRIORITY` makes the
+countries you prefer (Saudi Arabia, Qatar) come back about twice as often,
+and their jobs rank a little higher (+5 points) inside the same bucket. The ranking always
+shows every country, with a "Jobs per country" summary.
+
+Languages: German keeps its detailed check. Other languages (Arabic, Dutch,
+French, Swedish...) are read as required (with a level) / a plus / not
+required and compared with the languages in your profile: "Arabic required"
+is a plus for you, "fluent Dutch required" blocks.
+
 ### The database
 
 `data/jobradar.db` (SQLite, built into Python, nothing to install) remembers
@@ -81,8 +110,10 @@ Set in `config.py`:
 
 | Source | Setting | How it works |
 | --- | --- | --- |
-| LinkedIn, Indeed (Glassdoor, Google possible) | `SITES` | JobSpy runs every search term on each site, one site after the other |
+| LinkedIn, Indeed, Bayt (Glassdoor, Google possible) | `SITES` | JobSpy runs every search term on each site, in the countries whose profile lists that site |
 | Arbeitnow (German job board, free API) | `ARBEITNOW_PAGES` | reads the newest pages, keeps tech jobs |
+| Jaabz (jobs with visa sponsorship) | `JAABZ_PAGES` | reads its visa-sponsorship list for each of your countries, opens each new tech job once; the jobs count as "maybe visa" unless the ad says otherwise |
+| Relocate.me (jobs with a relocation package) | `RELOCATEME_PAGES` | reads its list pages, opens each new tech job once; "maybe visa" when the package includes visa services, else "relocation" |
 | Company career pages on Greenhouse | `GREENHOUSE_BOARDS` | all of the company's jobs; keeps tech jobs in your countries |
 | Company career pages on Lever | `LEVER_COMPANIES` | same |
 
@@ -95,14 +126,17 @@ Check a source from your computer before adding it:
 python sources_check.py                       # Arbeitnow + your configured boards
 python sources_check.py greenhouse n26 celonis
 python sources_check.py guesses               # try a starter list of companies
+python sources_check.py jaabz                 # read Jaabz for your countries
+python sources_check.py relocateme            # read Relocate.me
+python sources_check.py jaabz dump            # ... and save its HTML in data/samples
 ```
 
 It prints how many jobs each source has, how many JobRadar would keep, and
 the line to paste into `config.py`.
 
-### Rate limits (HTTP 429)
+### Rate limits (HTTP 429 / 403)
 
-LinkedIn and Indeed refuse requests when you scrape too often. JobRadar
+LinkedIn, Indeed and Bayt refuse requests when you scrape too often. JobRadar
 pauses between searches, retries a refused search once, and stops a site
 cleanly after repeated refusals while the other sites continue (settings in
 `config.py`). If a run says "Stopped early",
@@ -113,7 +147,7 @@ descriptions are recovered from earlier runs when possible.
 
 ```powershell
 python labels.py label      # one job at a time, 4 questions, one key each
-python labels.py evaluate   # where JobRadar disagrees with you
+python labels.py evaluate   # where JobRadar disagrees with you (re-analyzes first)
 python labels.py review     # go through each disagreement: who is right?
 ```
 
@@ -150,8 +184,9 @@ alone is not visa help. Inside a bucket, jobs that state visa support come first
 ## Project layout
 
 ```
-scraper.py              entry point: python scraper.py [--offline | --raw FILE]
-config.py               searches, sites, folders  <- edit this to change what is searched
+scraper.py              entry point: python scraper.py [--offline | --raw FILE | --countries ...]
+config.py               countries, sites, folders  <- edit this to change what is searched
+countries.py            one profile per country: searches, sites, cities, visa rules
 pipeline.py             collect -> dedupe -> normalize -> analyze -> score -> sort
 database.py             SQLite memory: jobs, first/last seen, your status
 track.py                mark jobs applied / not interested / closed
@@ -162,7 +197,8 @@ candidate_profile.py    YOUR profile (git-ignored)
 candidate_profile.example.py   template for the file above
 models/                 Job, Profile, WorkExperience, Language, CEFR helpers
 services/               analyzers (skills, experience, eligibility), matchers, scorer, classifier
-sources/                job sources: jobspy_source (LinkedIn, Indeed), arbeitnow, greenhouse, lever
+sources/                job sources: jobspy_source (LinkedIn, Indeed, Bayt), arbeitnow, jaabz, relocateme,
+                        greenhouse, lever; jsonld reads job pages (schema.org JobPosting)
 sources_check.py        test a source / company board from your computer
 tests/                  unit tests (they never use your real profile)
 ```
