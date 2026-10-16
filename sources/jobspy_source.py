@@ -1,4 +1,5 @@
 import logging
+import re
 
 import pandas as pd
 from jobspy import scrape_jobs
@@ -20,13 +21,17 @@ class _RateLimitWatcher(logging.Handler):
         self.search_blocked = False
         self.description_failures = 0
 
+    # 429 = too many requests; 403 = blocked (Bayt's Cloudflare says 403).
+    REFUSED = re.compile(r"status code (?:429|403)\b")
+
     def emit(self, record):
         message = record.getMessage()
+        refused = bool(self.REFUSED.search(message))
 
-        if "status code 429" in message and "for job" in message:
+        if refused and "for job" in message:
             # The search worked but one job page was refused.
             self.description_failures += 1
-        elif "status code 429" in message or "(blocked?)" in message:
+        elif refused or "(blocked?)" in message:
             # The search page itself was refused.
             self.search_blocked = True
 
@@ -42,9 +47,14 @@ def _jobspy_loggers():
 
 
 class JobSpySource(JobSource):
+    """
+    LinkedIn, Indeed, Bayt, Glassdoor... through JobSpy. Use one source per site,
+    so a site that refuses requests can be paused without stopping the others.
+    """
 
     def __init__(self, sites=None):
         self.sites = sites or ["linkedin"]
+        self.name = "+".join(self.sites)
 
         # Filled after every search().
         self.last_search_rate_limited = False
@@ -56,6 +66,7 @@ class JobSpySource(JobSource):
         location: str,
         results_wanted: int,
         hours_old: int,
+        country: str = None,
     ) -> pd.DataFrame:
 
         watcher = _RateLimitWatcher()
@@ -64,6 +75,12 @@ class JobSpySource(JobSource):
         for logger in loggers:
             logger.addHandler(watcher)
 
+        extra = {}
+
+        if country:
+            # Indeed and Glassdoor need the country name ("germany").
+            extra["country_indeed"] = country
+
         try:
             jobs = scrape_jobs(
                 site_name=self.sites,
@@ -71,7 +88,10 @@ class JobSpySource(JobSource):
                 location=location,
                 results_wanted=results_wanted,
                 hours_old=hours_old,
-                linkedin_fetch_description=True,
+                # Open every job page for the full description (LinkedIn
+                # and Bayt; Indeed always sends it).
+                fetch_description=True,
+                **extra,
             )
         finally:
             for logger in loggers:

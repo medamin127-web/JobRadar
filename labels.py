@@ -4,6 +4,7 @@ JobRadar is scored against your answers.
 
     python labels.py label       answer questions, one job at a time
     python labels.py evaluate    see where JobRadar disagrees with you
+                                 (re-analyzes first: no export needed)
     python labels.py review      go through each disagreement: who is right?
 
 `label` shows one job (title, company, the key sentences, the start of the
@@ -26,8 +27,8 @@ import webbrowser
 
 import pandas as pd
 
-from config import OUTPUT_DIR
-from pipeline import BUCKET_ORDER, process_jobs
+from config import OUTPUT_DIR, SEARCH_CONFIGS
+from pipeline import BUCKET_ORDER, assign_countries, process_jobs
 
 LABELS_DIR = os.path.join(os.path.dirname(OUTPUT_DIR), "labels")
 LABELS_FILE = os.path.join(LABELS_DIR, "labels.csv")
@@ -175,7 +176,7 @@ def export(path: str = LABELS_FILE, quiet: bool = False) -> None:
         if raw.empty:
             raise SystemExit("The database is empty. Run scraper.py first.")
 
-        jobs = process_jobs(raw, load_profile())
+        jobs = process_jobs(assign_countries(raw, SEARCH_CONFIGS), load_profile())
 
     jobs.sort(key=lambda j: BUCKET_ORDER.get(j.application_bucket, 9))
 
@@ -563,6 +564,11 @@ def main(argv=None) -> None:
     elif command == "evaluate":
         if not os.path.exists(LABELS_FILE):
             raise SystemExit("No labels yet. Run: python labels.py label")
+
+        # Re-analyze first, so the scores reflect the current code and
+        # profile (your answers are kept).
+        print("Refreshing JobRadar's answers (no scraping)...")
+        export(LABELS_FILE, quiet=True)
         print_evaluation(evaluate(read_labels(LABELS_FILE)))
     else:
         raise SystemExit("Usage: python labels.py label | evaluate | review | export")

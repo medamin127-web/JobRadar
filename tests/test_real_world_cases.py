@@ -259,6 +259,68 @@ class TestRelocationRefusalMeansNoVisa(unittest.TestCase):
         self.assertEqual(job.visa_sponsorship_status, "yes")
 
 
+class TestThirdRunCases(unittest.TestCase):
+    """From the Phase 3 run (Indeed + Arbeitnow + company boards)."""
+
+    def test_zurich_ideally_about_experience_does_not_make_german_optional(self):
+        text = ("Sehr gute Deutsch- und gute Englischkenntnisse sowie idealerweise "
+                "Erfahrung in der Versicherungsbranche")
+        result = analyze_german_requirement(text, "de")
+
+        self.assertEqual(result["requirement"], "required")
+        self.assertEqual(result["level_value"], 4)
+
+    def test_real_optional_statements_stay_optional(self):
+        for text in [
+            "Excellent English skills, German is a plus",
+            "Professional written and spoken English, German language skills a plus.",
+            "Deutsch ist ein Plus, aber kein Muss",
+            "Deutschkenntnisse von Vorteil",
+            "Fluent English, German highly advantageous",
+            "German is an advantage",
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(analyze_german_requirement(text, "en")["requirement"], "optional")
+
+    def test_optional_word_in_the_same_clause_as_german(self):
+        for text in [
+            "Du sprichst verhandlungssicheres Englisch und idealerweise Deutsch auf B1–B2-Niveau",
+            "Deutsch oder Englisch fließend.",
+            "Fluent English and German would be beneficial",
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(analyze_german_requirement(text, "de")["requirement"], "optional")
+
+    def test_willingness_to_travel_does_not_make_german_optional(self):
+        text = ("Starke Kommunikationsfähigkeit (fließend) auf Deutsch und Englisch "
+                "sowie Reisebereitschaft")
+        self.assertEqual(analyze_german_requirement(text, "de")["requirement"], "required")
+
+    def test_willingness_hint_loses_against_a_german_level(self):
+        text = ("Bereitschaft zur Einarbeitung in neue Themengebiete und "
+                "verhandlungssichere Deutschkenntnisse")
+        self.assertEqual(analyze_german_requirement(text, "de")["requirement"], "required")
+
+    def test_willingness_to_learn_german_is_optional(self):
+        for text in ["Willingness to learn German", "Bereitschaft, Deutsch zu lernen"]:
+            with self.subTest(text=text):
+                self.assertEqual(analyze_german_requirement(text, "en")["requirement"], "optional")
+
+    def test_other_language_being_a_plus_does_not_make_german_optional(self):
+        for text in ["Fluent German and English (French is a plus)",
+                     "Fluent German is required; English is a plus"]:
+            with self.subTest(text=text):
+                self.assertEqual(analyze_german_requirement(text, "en")["requirement"], "required")
+
+    def test_board_titles_that_are_not_development(self):
+        from sources.relevance import is_tech_title
+
+        for title in ["Junior Recipe Developer (all genders)", "Senior Applied Value Engineer",
+                      "Associate Applied (AI) Value Engineer (DACH) - Orbit Program"]:
+            with self.subTest(title=title):
+                self.assertFalse(is_tech_title(title))
+
+
 class TestScoring(unittest.TestCase):
 
     def test_two_detected_skills_cannot_make_a_96(self):

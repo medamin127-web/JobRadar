@@ -77,10 +77,71 @@ def print_ranking(job_objects) -> None:
             f"Target: {job.target_category or 'unknown':14} | "
             f"{job.title} | "
             f"{job.company} | "
-            f"{job.location}"
+            f"{job.location}{_country_text(job)}"
             f"{_age_text(job)}"
             f" | id {short_id(job.id)}"
         )
+
+
+def country_name(key) -> str:
+    from countries import COUNTRY_PROFILES
+
+    if not key:
+        return "Other / remote"
+
+    return COUNTRY_PROFILES.get(key, {}).get("name", key)
+
+
+def _country_text(job) -> str:
+    """Show the country only when the location does not already name it."""
+
+    from countries import COUNTRY_PROFILES
+    from sources.relevance import has_keyword
+
+    if not job.country:
+        return ""
+
+    keywords = COUNTRY_PROFILES.get(job.country, {}).get("location_keywords", [])
+
+    if has_keyword(job.location, keywords):
+        return ""   # "Dubai, UAE" already says it
+
+    return f" [{country_name(job.country)}]"
+
+
+def print_countries(job_objects) -> None:
+    """How many jobs per country, and how many worth applying to."""
+
+    if not job_objects:
+        return
+
+    from collections import Counter
+
+    total = Counter(country_name(job.country) for job in job_objects)
+    good = Counter(
+        country_name(job.country)
+        for job in job_objects
+        if job.application_bucket in ("apply_now", "apply_with_research")
+    )
+
+    print("\nJobs per country (recommended / all):")
+
+    for name, count in total.most_common():
+        print(f"  {name:24} {good.get(name, 0):3} / {count}")
+
+
+def languages_text(job) -> str:
+    """'Arabic required C1, Dutch optional' or 'None'."""
+
+    from models.cefr import level_label
+
+    parts = []
+
+    for name, info in (job.other_languages or {}).items():
+        level = level_label(info.get("level_value")) if info.get("level_value") else ""
+        parts.append(f"{name} {info.get('requirement')} {level}".strip())
+
+    return ", ".join(parts) or "None"
 
 
 def short_id(job_id) -> str:
@@ -140,7 +201,8 @@ def print_details(job_objects) -> None:
         print(f"\n{job.title}{'   [NEW]' if job.is_new else ''}")
         print(f"Company: {job.company}")
         print(f"Id: {short_id(job.id)}   Posted/first seen: {job.age_days} days ago   Status: {job.status}")
-        print(f"Location: {job.location}")
+        print(f"Found on: {job.found_on or job.site}   {job.job_url or ''}")
+        print(f"Location: {job.location}   Country: {country_name(job.country)}")
         print(f"Match Score: {job.match_score}/100")
         print(f"Confidence: {job.confidence}")
         print(f"Coverage: {job.match_coverage}%")
@@ -182,6 +244,10 @@ def print_details(job_objects) -> None:
         print(f"  Salary hint (max, EUR/year): {job.salary_hint_max_eur}")
         print(f"  Relocation: {job.relocation_support} | {job.relocation_evidence}")
         print(f"  German: {job.german_requirement} {job.german_level_required or ''} | {job.german_evidence}")
+        print(f"  Other languages: {languages_text(job)}")
+
+        if job.local_hire:
+            print(f"  Local hiring: {job.local_hire} | {job.local_hire_evidence}")
         print(f"  Job language: {job.job_language} | Work mode: {job.work_mode} | Remote scope: {job.remote_scope}")
 
 

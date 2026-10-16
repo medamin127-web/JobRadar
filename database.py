@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS jobs (
     status_note     TEXT,
     status_updated  TEXT
 );
+
+-- When each country was last searched (to take turns between countries).
+CREATE TABLE IF NOT EXISTS country_runs (
+    country         TEXT PRIMARY KEY,
+    last_searched   TEXT NOT NULL
+);
 """
 
 _RAW_FILE_TIME = re.compile(r"jobs_raw_(\d{8})_(\d{6})")
@@ -269,6 +275,57 @@ class JobStore:
             for row in self.connection.execute(
                 "SELECT id, first_seen, status, status_note, date_posted FROM jobs"
             )
+        }
+
+    # ==================================================
+    # TAKING TURNS BETWEEN COUNTRIES
+    # ==================================================
+
+    def countries_to_search(self, keys, how_many: int, priorities=None, now=None) -> list:
+        """
+        The `how_many` most overdue countries: never searched first, then
+        by (hours since the last search) x priority, so a priority-2
+        country comes back about twice as often. Ties keep the order of
+        `keys`. 0 or less = all of them.
+        """
+
+        keys = list(keys)
+
+        if how_many <= 0 or how_many >= len(keys):
+            return keys
+
+        priorities = priorities or {}
+        now = now or datetime.now()
+        last = self.last_searched()
+
+        def overdue(key):
+            when = last.get(key)
+
+            if not when:
+                return float("inf")
+
+            hours = (now - datetime.fromisoformat(when)).total_seconds() / 3600
+            return max(hours, 0) * priorities.get(key, 1)
+
+        ordered = sorted(keys, key=lambda key: (-overdue(key), keys.index(key)))
+
+        return ordered[:how_many]
+
+    def mark_searched(self, keys, when: str = None) -> None:
+        when = when or datetime.now().isoformat(timespec="seconds")
+
+        with self.connection:
+            for key in keys:
+                self.connection.execute(
+                    "INSERT INTO country_runs (country, last_searched) VALUES (?, ?) "
+                    "ON CONFLICT(country) DO UPDATE SET last_searched = excluded.last_searched",
+                    (key, when),
+                )
+
+    def last_searched(self) -> dict:
+        return {
+            row["country"]: row["last_searched"]
+            for row in self.connection.execute("SELECT * FROM country_runs")
         }
 
     # ==================================================

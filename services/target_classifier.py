@@ -83,6 +83,15 @@ class TargetClassifier:
                 f"experience; you have {candidate_years:g}."
             )
 
+        # Internships and student jobs need you to be enrolled at a
+        # university; you have graduated.
+        if category is None and job_level == "intern":
+            category = "low_priority"
+            reason = (
+                "Internship / working-student position: these require "
+                "being enrolled as a student."
+            )
+
         if (
             category is None
             and candidate_years is not None
