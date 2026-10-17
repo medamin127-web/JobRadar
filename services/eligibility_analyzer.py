@@ -427,7 +427,9 @@ VISA_TOPIC = re.compile(
     r"|authori[sz]ed to work|right to work|(?:legally )?(?:allowed|permitted|entitled|eligible) to work"
     r"|blue card|blaue karte|\bsponsor\w*|\beu[- ]?(?:citizen|national|b(?:ü|u)rger|staatsb)"
     r"|staatsangeh\w+|arbeitsberechtigung"
-    r"|berechtigung zur beschäftigung|beschäftigungserlaubnis",
+    r"|berechtigung zur beschäftigung|beschäftigungserlaubnis"
+    r"|skilled worker|highly skilled migrant|kennismigrant|\bhsm\b|critical skills"
+    r"|employment permit|stamp\s*(?:4|1g)|settled status|indefinite leave",
     re.IGNORECASE,
 )
 
@@ -462,15 +464,22 @@ POSITIVE_VERBS = re.compile(
     re.IGNORECASE,
 )
 
+_PERMITS = (
+    r"(?:visa|work permit|blue card|skilled worker|highly skilled migrant|kennismigrant"
+    r"|critical skills|employment permit)"
+)
+
 SPONSOR_TERM = re.compile(
-    r"(?:visa|work permit|blue card)s?\W+(?:\w+\W+){0,2}sponsor\w*"
-    r"|sponsor\w*\W+(?:\w+\W+){0,3}(?:visa|work permit|blue card|permit)s?",
+    _PERMITS + r"s?\W+(?:\w+\W+){0,2}sponsor\w*"
+    r"|sponsor\w*\W+(?:\w+\W+){0,3}" + _PERMITS + r"s?"
+    r"|sponsor\w*\W+(?:\w+\W+){0,3}permits?",
     re.IGNORECASE,
 )
 
 SUPPORT_VISA = re.compile(
     r"(?:support|assist|help|unterstütz\w*|begleit\w*|kümmern\w*)\W+(?:\w+\W+){0,6}"
-    r"(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|arbeitsgenehmigung|blue card|blaue karte|einreise)"
+    r"(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|arbeitsgenehmigung|blue card|blaue karte|einreise"
+    r"|employment permit|critical skills|highly skilled migrant|kennismigrant|skilled worker)"
     r"|(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|blue card|blaue karte)\W+(?:\w+\W+){0,4}"
     r"(?:support|assistance|unterstützung|unterstützen|übernehmen|help)",
     re.IGNORECASE,
@@ -501,6 +510,9 @@ _AUTH_WORDS = (
     "|arbeitserlaubnis|arbeitsgenehmigung|aufenthaltstitel"
     "|aufenthaltsgenehmigung|arbeitsberechtigung"
     "|berechtigung zur beschäftigung|beschäftigungserlaubnis"
+    # UK / Ireland: already holding a status that allows work
+    "|stamp\\s*(?:4|1g)|settled status|pre-settled status|indefinite leave to remain"
+    "|eu passport|irish citizenship|british citizenship|uk passport"
 )
 
 _ALLOWED_TO_WORK = (
@@ -515,7 +527,7 @@ WORK_AUTH_REQUIRED = compile_all([
     + _AUTH_WORDS + "|" + _ALLOWED_TO_WORK + ")",
     "(?:" + _AUTH_WORDS + r")\s+(?:\w+\s+){0,5}(?:is |are |ist |sind )?"
     r"(?:required|mandatory|needed|necessary|erforderlich|notwendig|vorausgesetzt|zwingend|nachzuweisen)",
-    r"(?:authori[sz]ed|eligible|legally (?:allowed|permitted|entitled)|allowed|permitted) to work (?:in|within) (?:germany|the eu|europe|the european union)",
+    r"(?:authori[sz]ed|eligible|legally (?:allowed|permitted|entitled)|allowed|permitted) to work (?:in|within) (?:the )?(?:germany|eu|europe|european union|uk|united kingdom|ireland|netherlands|eea)",
     r"\beu[- ]?(?:citizens?|nationals?)\s+(?:\w+\s+){0,3}(?:only|required)"
     r"|\bonly\s+(?:\w+\s+){0,2}eu[- ]?(?:citizens?|nationals?)"
     r"|\bnur\s+(?:\w+\s+){0,2}eu[- ]?b(?:ü|u)rger",
@@ -682,6 +694,17 @@ REMOTE_GERMANY_ONLY = re.compile(
     re.IGNORECASE,
 )
 
+# Remote, but only from inside one of the countries JobRadar searches.
+REMOTE_COUNTRY_ONLY = re.compile(
+    r"(?:remote|home ?office|work from home|wfh)\W+(?:\w+\W+){0,6}(?:within|in|from|inside|only)\W+(?:the\W+)?"
+    r"(?:uk|united kingdom|england|netherlands|nederland|ireland|uae|united arab emirates|saudi arabia|ksa|qatar)\b"
+    r"|(?:based|located|living|residing|resident|residents)\W+(?:\w+\W+){0,4}(?:the\W+)?"
+    r"(?:uk|united kingdom|netherlands|ireland)\b"
+    r"|\bremote\s*[-–(]\s*(?:uk|united kingdom|netherlands|nl|ireland|ie)\b"
+    r"|\b(?:uk|netherlands|ireland)[- ](?:based|remote)\b",
+    re.IGNORECASE,
+)
+
 REMOTE_EU_ONLY = re.compile(
     r"\beu[- ]based|\beu only|\beu residents?|\beea residents?"
     r"|(?:based|located|residing|living|resident|residents)\W+(?:\w+\W+){0,3}(?:the )?(?:eu|european union|eea|europe)\b"
@@ -703,7 +726,9 @@ REMOTE_LIMITED = re.compile(
 REMOTE_EMEA = re.compile(r"\bemea\b|\bafrica\b", re.IGNORECASE)
 
 INTERNATIONAL_FRIENDLY = re.compile(
-    r"(?:international|global|diverse)\s+(?:team|teams|applicants|candidates|talent|workforce|environment)"
+    # The Dutch 30% ruling is a tax benefit for people hired from abroad.
+    r"30\s?%\s*(?:tax\s*)?(?:ruling|regeling|facility)|\bexpat (?:tax|ruling|package)"
+    r"|(?:international|global|diverse)\s+(?:team|teams|applicants|candidates|talent|workforce|environment)"
     r"|applicants? from (?:all over|around) the world|open to (?:international|candidates from)"
     r"|candidates from abroad|bewerber\w* aus dem ausland|internationale\w* team"
     r"|applicants? (?:from )?outside (?:of )?(?:the )?eu",
@@ -743,11 +768,12 @@ def analyze_remote(job: Job, text: str) -> dict:
 
     worldwide = bool(REMOTE_WORLDWIDE.search(scope_text))
     germany = bool(REMOTE_GERMANY_ONLY.search(scope_text))
+    country = bool(REMOTE_COUNTRY_ONLY.search(scope_text))
     eu = bool(REMOTE_EU_ONLY.search(scope_text))
     emea = bool(REMOTE_EMEA.search(scope_text))
     limited = bool(REMOTE_LIMITED.search(scope_text))
 
-    restricted = germany or eu
+    restricted = germany or eu or country
 
     if worldwide and restricted:
         scope = "unknown"
@@ -755,6 +781,8 @@ def analyze_remote(job: Job, text: str) -> dict:
         scope = "limited_countries"
     elif germany:
         scope = "germany_only"
+    elif country:
+        scope = "country_only"
     elif eu:
         scope = "eu_only"
     elif worldwide:

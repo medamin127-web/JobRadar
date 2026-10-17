@@ -58,6 +58,8 @@ FRONT_COLUMNS = [
     "german_level_required",
     "other_languages",
     "local_hire",
+    "sponsor_register",
+    "sponsor_register_name",
     "country",
     "work_mode",
     "remote_scope",
@@ -472,7 +474,25 @@ def sort_jobs(job_objects, priorities=None) -> None:
 # 6. EVERYTHING AFTER COLLECTING
 # ==================================================
 
-def process_jobs(jobs: pd.DataFrame, profile, priorities=None) -> list:
+def attach_sponsor_registers(job_objects, registers) -> None:
+    """Mark jobs whose country has an official sponsor register."""
+
+    from countries import profile_of
+
+    for job in job_objects:
+        country = profile_of(job.country) or {}
+        register = (registers or {}).get(country.get("sponsor_register"))
+
+        if register is None or not job.company:
+            continue
+
+        name = register.find(job.company)
+        job.sponsor_register = "listed" if name else "not_listed"
+        job.sponsor_register_name = name
+        job.sponsor_register_title = register.title
+
+
+def process_jobs(jobs: pd.DataFrame, profile, priorities=None, registers=None) -> list:
     """Raw DataFrame -> sorted list of fully analyzed Job objects."""
 
     jobs = deduplicate(jobs)
@@ -482,6 +502,7 @@ def process_jobs(jobs: pd.DataFrame, profile, priorities=None) -> list:
     print(f"Normalized jobs: {len(job_objects)}")
 
     analyze_jobs(job_objects)
+    attach_sponsor_registers(job_objects, registers)
     score_jobs(job_objects, profile)
     sort_jobs(job_objects, priorities)
 

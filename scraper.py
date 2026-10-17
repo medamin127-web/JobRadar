@@ -351,8 +351,14 @@ def main(argv=None) -> None:
         raw, new_ids = collect(args, store)
 
         # 2. De-duplicate, normalize, analyze, score, sort
-        priorities = {config["key"]: config.get("priority", 1) for config in ranking_configs(args)}
-        job_objects = process_jobs(raw, profile, priorities)
+        configs = ranking_configs(args)
+        priorities = {config["key"]: config.get("priority", 1) for config in configs}
+
+        # Official sponsor registers (UK, NL): downloaded every 2 weeks.
+        import sponsors
+
+        registers = sponsors.load_for(configs)
+        job_objects = process_jobs(raw, profile, priorities, registers)
 
         # 3. Your status: hide what you applied to / dismissed
         attach_tracking(job_objects, store.info(), new_ids)

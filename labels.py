@@ -176,7 +176,10 @@ def export(path: str = LABELS_FILE, quiet: bool = False) -> None:
         if raw.empty:
             raise SystemExit("The database is empty. Run scraper.py first.")
 
-        jobs = process_jobs(assign_countries(raw, SEARCH_CONFIGS), load_profile())
+        import sponsors
+
+        registers = sponsors.load_for(SEARCH_CONFIGS, auto_update=False, output=lambda *_: None)
+        jobs = process_jobs(assign_countries(raw, SEARCH_CONFIGS), load_profile(), registers=registers)
 
     jobs.sort(key=lambda j: BUCKET_ORDER.get(j.application_bucket, 9))
 

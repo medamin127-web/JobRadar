@@ -77,8 +77,8 @@ profile in `countries.py`: the search location, the search terms, which
 sites make sense there (Bayt is Gulf only), the city names used to place
 feed jobs, the local language, and how visas usually work there:
 
-- **explicit** (Germany): an ad that says nothing about visas is not counted
-  as visa support.
+- **explicit** (Germany, Netherlands, Ireland, UK): an ad that says nothing
+  about visas is not counted as visa support.
 - **employer_sponsored** (UAE, Saudi Arabia, Qatar, Kuwait, Oman, Bahrain):
   the employer normally arranges the work visa, so a silent ad is a cautious
   "possible". Ads for nationals only (UAE nationals, Emiratisation,
@@ -91,6 +91,17 @@ overdue ones) and says which ones come next. `COUNTRY_PRIORITY` makes the
 countries you prefer (Saudi Arabia, Qatar) come back about twice as often,
 and their jobs rank a little higher (+5 points) inside the same bucket. The ranking always
 shows every country, with a "Jobs per country" summary.
+
+**Official sponsor registers (UK, Netherlands).** In these two countries
+only registered employers can sponsor a work permit (UK Skilled Worker,
+Dutch highly skilled migrant). `sponsors.py` downloads the official lists
+to `data/registers/` every 2 weeks; a job there shows "on the register"
+(a good sign) or "not on the register" (probably cannot sponsor you):
+
+```powershell
+python sponsors.py update          # download both registers now
+python sponsors.py check Picnic    # is this company on a register?
+```
 
 Languages: German keeps its detailed check. Other languages (Arabic, Dutch,
 French, Swedish...) are read as required (with a level) / a plus / not
@@ -189,6 +200,7 @@ alone is not visa help. Inside a bucket, jobs that state visa support come first
 scraper.py              entry point: python scraper.py [--offline | --raw FILE | --countries ...]
 config.py               countries, sites, folders  <- edit this to change what is searched
 countries.py            one profile per country: searches, sites, cities, visa rules
+sponsors.py             official sponsor registers (UK, NL): download + company lookup
 pipeline.py             collect -> dedupe -> normalize -> analyze -> score -> sort
 database.py             SQLite memory: jobs, first/last seen, your status
 track.py                mark jobs applied / not interested / closed

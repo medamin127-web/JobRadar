@@ -11,8 +11,9 @@ Edit this file to change searches. Nothing here runs anything.
 from countries import search_configs
 
 # Countries to search, from the profiles in countries.py. Ready there:
-#   germany, uae, saudi_arabia, qatar, kuwait, oman, bahrain
-COUNTRIES = ["saudi_arabia", "qatar", "germany", "uae"]
+#   germany, netherlands, ireland, uk, uae, saudi_arabia, qatar,
+#   kuwait, oman, bahrain
+COUNTRIES = ["saudi_arabia", "qatar", "germany", "netherlands", "ireland", "uk", "uae"]
 
 # Countries you prefer. Priority 2 = searched about twice as often as the
 # others, and their jobs rank a little higher (+5 points) inside the same
@@ -24,7 +25,7 @@ COUNTRY_PRIORITY = {"saudi_arabia": 2, "qatar": 2}
 # overdue (time since their last search x their priority). The ranking always shows every country.
 # 0 = all countries every run.  Override once with:
 #   python scraper.py --countries uae,qatar
-COUNTRIES_PER_RUN = 2
+COUNTRIES_PER_RUN = 3
 
 SEARCH_CONFIGS = search_configs(COUNTRIES, COUNTRY_PRIORITY)
 
@@ -76,8 +77,9 @@ HOURS_OLD = 72
 # BEING GENTLE WITH LINKEDIN (HTTP 429 = "too many requests")
 # ==================================================
 
-# Random pause between two searches, in seconds.
-DELAY_BETWEEN_SEARCHES = (6, 15)
+# Random pause between two searches, in seconds. Longer pauses mean fewer
+# refusals (each refusal costs a 90 s wait anyway).
+DELAY_BETWEEN_SEARCHES = (15, 30)
 
 # When a search is refused: wait this long, then retry it once.
 RATE_LIMIT_WAIT_SECONDS = 90

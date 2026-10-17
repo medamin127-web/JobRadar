@@ -115,6 +115,20 @@ class EligibilityEvaluator:
         if employer_visa_norm:
             positives.append("EMPLOYER_VISA_IS_THE_NORM_THERE")
 
+        # ---------------- Official sponsor register (UK, NL) ----------------
+        # Only registered employers can sponsor a Skilled Worker (UK) or
+        # highly skilled migrant (NL) permit.
+
+        on_register = job.sponsor_register == "listed"
+        off_register = job.sponsor_register == "not_listed"
+
+        if on_register:
+            positives.append("ON_OFFICIAL_SPONSOR_REGISTER")
+        elif off_register and sponsored:
+            warnings.append("SAYS_SPONSOR_BUT_NOT_ON_REGISTER")
+        elif off_register:
+            warnings.append("NOT_ON_OFFICIAL_SPONSOR_REGISTER")
+
         # ---------------- Remote ----------------
 
         worldwide_remote = (
@@ -129,7 +143,7 @@ class EligibilityEvaluator:
                 positives.append("REMOTE_EMEA")
             elif job.remote_scope == "limited_countries":
                 warnings.append("REMOTE_LIMITED_COUNTRIES")
-            elif job.remote_scope in ("germany_only", "eu_only"):
+            elif job.remote_scope in ("germany_only", "country_only", "eu_only"):
                 if not sponsored and relocation != "yes":
                     blockers.append("REMOTE_REGION_RESTRICTED")
                 else:
@@ -221,7 +235,8 @@ class EligibilityEvaluator:
             # already live in Germany.
             strong = sponsored or worldwide_remote
             medium = (
-                relocation == "yes"
+                on_register
+                or relocation == "yes"
                 or visa == "maybe"
                 or board_visa
                 or board_relocation
@@ -236,6 +251,10 @@ class EligibilityEvaluator:
 
             if strong:
                 status = "possible" if warnings else "likely"
+            elif off_register and not on_register:
+                # Not on the register and no visa statement: the company
+                # cannot sponsor your permit there (or the name differs).
+                status = "unlikely"
             elif medium:
                 status = "possible"
             elif requirement in ("required", "implied"):
@@ -370,7 +389,14 @@ class ApplicationBucketer:
 
         elif status == "unlikely":
             bucket = "long_shot" if category == "good_target" else "skip"
-            reason = "Probably needs German or a work permit you do not have."
+
+            if "NOT_ON_OFFICIAL_SPONSOR_REGISTER" in job.eligibility_warnings:
+                reason = (
+                    "The company is not on the official sponsor register "
+                    f"({job.sponsor_register_title}), so it probably cannot sponsor your visa."
+                )
+            else:
+                reason = "Probably needs German or a work permit you do not have."
 
         else:
             bucket = "review"

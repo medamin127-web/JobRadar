@@ -123,6 +123,11 @@ class Job:
     other_languages: dict = field(default_factory=dict)
     local_hire: Optional[str] = None     # nationals_only | in_country_only | preferred | None
     local_hire_evidence: Optional[str] = None
+    # Official sponsor register of the job's country (sponsors.py):
+    # listed | not_listed | None (no register for that country)
+    sponsor_register: Optional[str] = None
+    sponsor_register_name: Optional[str] = None   # the company's name there
+    sponsor_register_title: Optional[str] = None  # "UK register of licensed sponsors"
     english_working_language: Optional[bool] = None
 
     visa_sponsorship_status: Optional[str] = None  # yes | no | mixed | unknown

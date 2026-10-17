@@ -248,6 +248,10 @@ def print_details(job_objects) -> None:
 
         if job.local_hire:
             print(f"  Local hiring: {job.local_hire} | {job.local_hire_evidence}")
+
+        if job.sponsor_register:
+            found = f"yes, as '{job.sponsor_register_name}'" if job.sponsor_register == "listed" else "not found"
+            print(f"  {job.sponsor_register_title}: {found}")
         print(f"  Job language: {job.job_language} | Work mode: {job.work_mode} | Remote scope: {job.remote_scope}")
 
 

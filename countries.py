@@ -12,6 +12,8 @@ Fields:
     sites              search sites that make sense there (Bayt = Gulf only,
                        Glassdoor = not in the Gulf)
     stepstone          StepStone's site there (optional), stepstone_terms its searches
+    sponsor_register   official list of employers allowed to sponsor visas
+                       (sponsors.py): "uk" or "nl"
     location_keywords  a feed job (Jaabz, Arbeitnow, career pages) belongs
                        to this country when its location contains one
     local_language     the language employers may ask for
@@ -67,6 +69,75 @@ COUNTRY_PROFILES = {
             "Software Engineer relocation",
             "Developer relocation Germany",
             "Software Engineer EU Blue Card",
+        ],
+    },
+
+    "netherlands": {
+        "name": "Netherlands",
+        "jaabz": "netherlands",
+        "location": "Netherlands",
+        "indeed_country": "netherlands",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Dutch",
+        "visa_norm": "explicit",
+        # Highly skilled migrant permits go through IND recognised sponsors.
+        "sponsor_register": "nl",
+        "location_keywords": [
+            "netherlands", "nederland", "the netherlands", "holland", "amsterdam",
+            "rotterdam", "utrecht", "the hague", "den haag", "'s-gravenhage",
+            "eindhoven", "delft", "leiden", "groningen", "haarlem", "amersfoort",
+            "arnhem", "nijmegen", "tilburg", "breda", "maastricht", "zwolle",
+            "enschede", "almere", "hilversum", "schiphol", "amstelveen",
+            "hoofddorp", "den bosch", "'s-hertogenbosch", "noord-holland",
+            "zuid-holland", "noord-brabant",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer visa sponsorship",
+            "Developer highly skilled migrant",
+        ],
+    },
+
+    "ireland": {
+        "name": "Ireland",
+        "jaabz": "ireland",
+        "location": "Ireland",
+        "indeed_country": "ireland",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "English",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "ireland", "dublin", "cork", "galway", "limerick", "waterford",
+            "athlone", "kilkenny", "sligo", "drogheda", "dundalk", "letterkenny",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer visa sponsorship",
+        ],
+    },
+
+    "uk": {
+        "name": "United Kingdom",
+        "jaabz": "united-kingdom",
+        "location": "United Kingdom",
+        "indeed_country": "uk",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "English",
+        "visa_norm": "explicit",
+        # Only licensed sponsors can sponsor a Skilled Worker visa.
+        "sponsor_register": "uk",
+        "location_keywords": [
+            "united kingdom", "uk", "england", "scotland", "wales", "northern ireland",
+            "london", "manchester", "birmingham", "edinburgh", "glasgow", "leeds",
+            "bristol", "cambridge", "oxford", "belfast", "liverpool", "newcastle",
+            "sheffield", "nottingham", "brighton", "cardiff", "milton keynes",
+            "southampton", "leicester", "coventry", "aberdeen",
+            "greater london",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer visa sponsorship",
+            "Graduate Software Engineer",
         ],
     },
 
@@ -182,10 +253,10 @@ def search_configs(keys, priorities=None):
 def country_of_location(location, configs):
     """The key of the first country whose keywords appear in a location."""
 
-    from sources.relevance import has_keyword
+    from sources.relevance import in_country
 
     for config in configs:
-        if has_keyword(location, config.get("location_keywords", [])):
+        if in_country(location, config.get("location_keywords", [])):
             return config["key"]
 
     return None
