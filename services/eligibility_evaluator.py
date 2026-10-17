@@ -127,7 +127,10 @@ class EligibilityEvaluator:
         elif off_register and sponsored:
             warnings.append("SAYS_SPONSOR_BUT_NOT_ON_REGISTER")
         elif off_register:
-            warnings.append("NOT_ON_OFFICIAL_SPONSOR_REGISTER")
+            # Only a warning: big employers often register under another
+            # legal name (Deliveroo = "Roofoods Ltd"), and recruiters post
+            # for clients. The job ranks lower; read the ad.
+            warnings.append("NOT_FOUND_ON_SPONSOR_REGISTER")
 
         # ---------------- Remote ----------------
 
@@ -251,10 +254,6 @@ class EligibilityEvaluator:
 
             if strong:
                 status = "possible" if warnings else "likely"
-            elif off_register and not on_register:
-                # Not on the register and no visa statement: the company
-                # cannot sponsor your permit there (or the name differs).
-                status = "unlikely"
             elif medium:
                 status = "possible"
             elif requirement in ("required", "implied"):
@@ -390,13 +389,7 @@ class ApplicationBucketer:
         elif status == "unlikely":
             bucket = "long_shot" if category == "good_target" else "skip"
 
-            if "NOT_ON_OFFICIAL_SPONSOR_REGISTER" in job.eligibility_warnings:
-                reason = (
-                    "The company is not on the official sponsor register "
-                    f"({job.sponsor_register_title}), so it probably cannot sponsor your visa."
-                )
-            else:
-                reason = "Probably needs German or a work permit you do not have."
+            reason = "Probably needs German or a work permit you do not have."
 
         else:
             bucket = "review"

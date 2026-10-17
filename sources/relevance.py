@@ -25,7 +25,7 @@ NOT_TECH = re.compile(
     r"|recipe|value engineer|pre-?sales|customer success"
     r"|planning engineer|site engineer|commissioning|draftsman|draughtsman"
     r"|interior|landscap|timekeeper|\bhvac\b|\bmep\b|surveyor|estimator"
-    r"|technician|\bit support\b|helpdesk|help desk",
+    r"|technician|\bit support\b|helpdesk|help desk|volunteer|vrijwillig",
     re.IGNORECASE,
 )
 

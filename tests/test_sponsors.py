@@ -60,6 +60,24 @@ class TestMatching(unittest.TestCase):
         self.assertEqual(self.uk.find("THG (The Hut Group)"), None)       # different name: no guess
         self.assertEqual(self.uk.find("The Hut Group"), "The Hut Group Limited")
 
+    def test_other_companies_with_the_same_first_word_do_not_match(self):
+        # Real wrong matches from the first UK run (123,000 employers).
+        register = sponsors.SponsorRegister("uk", [
+            "Picnic Kebab House", "The Sardine Factory Restaurant", "Maximus Accountants",
+            "Turing House School", "PASS (PORTABLE APPLIANCE SAFETY SERVICES) LTD",
+            "ADYEN N.V. LONDON BRANCH", "Monzo Bank Ltd", "UK Wise Group Ltd",
+            "Infor (Barneveld) B.V.", "Pigment Global Limited",
+        ])
+
+        for company in ("Picnic", "Sardine", "Maximus", "turing", "Pass Ltd"):
+            self.assertIsNone(register.find(company), company)
+
+        self.assertEqual(register.find("Adyen"), "ADYEN N.V. LONDON BRANCH")
+        self.assertEqual(register.find("monzo"), "Monzo Bank Ltd")
+        self.assertEqual(register.find("Wise"), "UK Wise Group Ltd")
+        self.assertEqual(register.find("Infor"), "Infor (Barneveld) B.V.")
+        self.assertEqual(register.find("Pigment"), "Pigment Global Limited")
+
     def test_short_names_need_an_exact_match(self):
         self.assertEqual(self.nl.find("ING"), None)          # "ing bank" is not "ing"
         self.assertEqual(self.nl.find("ING Bank"), "ING Bank N.V.")
@@ -164,12 +182,22 @@ class TestVerdicts(unittest.TestCase):
         self.assertEqual(job.eligibility_status, "possible")
         self.assertEqual(job.application_bucket, "apply_with_research")
 
-    def test_not_on_the_register_and_silent_is_unlikely(self):
+    def test_not_found_is_a_warning_and_ranks_lower(self):
+        # Big employers register under other names (Deliveroo = Roofoods Ltd):
+        # "not found" must not bury the job.
         job = self.evaluate(self.FILLER, self.register("Other Company Ltd"))
 
-        self.assertEqual(job.eligibility_status, "unlikely")
-        self.assertIn("NOT_ON_OFFICIAL_SPONSOR_REGISTER", job.eligibility_warnings)
-        self.assertIn("not on the official sponsor register", job.bucket_reason)
+        self.assertEqual(job.eligibility_status, "possible")
+        self.assertIn("NOT_FOUND_ON_SPONSOR_REGISTER", job.eligibility_warnings)
+        self.assertEqual(job.application_bucket, "apply_with_research")
+
+        listed = self.evaluate(self.FILLER, self.register("Picnic Technologies Ltd"))
+
+        from pipeline import sort_jobs
+
+        jobs = [job, listed]
+        sort_jobs(jobs)
+        self.assertEqual(jobs[0].sponsor_register, "listed")
 
     def test_ad_promising_a_visa_wins_with_a_warning(self):
         job = self.evaluate(self.FILLER + "We can sponsor Skilled Worker visas.",

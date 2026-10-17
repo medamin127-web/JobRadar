@@ -49,12 +49,19 @@ _LEGAL = re.compile(
 )
 
 
+def _brackets(match) -> str:
+    # "(UK)", "(Barneveld)": a note, dropped. "(PORTABLE APPLIANCE SAFETY
+    # SERVICES)": part of the name, kept.
+    inside = match.group(1)
+    return " " if len(inside.split()) <= 2 else f" {inside} "
+
+
 def normalize_company(name) -> str:
     """'Picnic Technologies B.V.' -> 'picnic technologies'"""
 
     text = unicodedata.normalize("NFKD", str(name or "")).encode("ascii", "ignore").decode()
     text = text.lower().replace("&", " and ")
-    text = re.sub(r"\(.*?\)", " ", text)          # "(UK)", "(trading as ...)"
+    text = re.sub(r"\((.*?)\)", _brackets, text)
     text = text.replace(".", "")                  # "b.v." -> "bv", "booking.com" -> "bookingcom"
     text = re.sub(r"[^a-z0-9]+", " ", text)
     text = _LEGAL.sub(" ", text)
@@ -85,9 +92,11 @@ class SponsorRegister:
         """
         The register's name for this company, or None.
 
-        Exact match after normalizing, or the register name starting with the
-        company's full name ("Picnic" -> "Picnic Technologies B.V."), only
-        for names of 5+ letters so "ING" does not match "ING-something".
+        Exact match after normalizing ("Booking.com" = "BOOKING.COM LIMITED"),
+        or the register name = the company's name + only generic company
+        words: "Picnic" = "Picnic Technologies B.V.", "Adyen" = "ADYEN N.V.
+        LONDON BRANCH". Never "Picnic" = "Picnic Kebab House": with 120,000+
+        UK employers, a shared first word means nothing.
         """
 
         normal = normalize_company(company)
@@ -98,7 +107,7 @@ class SponsorRegister:
         if normal in self.by_name:
             return self.by_name[normal]
 
-        if len(normal.replace(" ", "")) < 5:
+        if len(normal.replace(" ", "")) < 4:
             return None
 
         prefix = normal + " "
@@ -106,11 +115,36 @@ class SponsorRegister:
         from bisect import bisect_left
 
         index = bisect_left(self.sorted_names, prefix)
+        found = []
 
-        if index < len(self.sorted_names) and self.sorted_names[index].startswith(prefix):
-            return self.by_name[self.sorted_names[index]]
+        while index < len(self.sorted_names) and self.sorted_names[index].startswith(prefix):
+            rest = self.sorted_names[index][len(prefix):].split()
 
-        return None
+            if rest and all(word in GENERIC_COMPANY_WORDS for word in rest):
+                found.append(self.sorted_names[index])
+
+            index += 1
+
+        # Several different companies fit: do not guess.
+        return self.by_name[found[0]] if len(found) == 1 else (
+            self.by_name[min(found, key=len)] if found else None
+        )
+
+
+# Words a company adds to its brand in its legal name. Anything else
+# ("kebab", "school", "accountants", "restaurant") means another company.
+GENERIC_COMPANY_WORDS = {
+    "technologies", "technology", "tech", "software", "systems", "solutions",
+    "digital", "labs", "lab", "services", "service", "consulting", "consultancy",
+    "bank", "banking", "financial", "finance", "payments", "pay", "energy",
+    "energie", "global", "worldwide", "eu", "emea", "london", "amsterdam",
+    "dublin", "branch", "office", "netherlands", "nederland", "ireland",
+    "england", "britain", "british", "operations", "security", "platforms",
+    "platform", "networks", "network", "media", "health", "healthcare",
+    "online", "it", "ai", "analytics", "data", "cloud", "interactive",
+    "studios", "studio", "ventures", "capital", "markets", "trading",
+    "investments", "management", "europa", "benelux", "and",
+}
 
 
 # ==================================================

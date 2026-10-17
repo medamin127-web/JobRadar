@@ -447,6 +447,10 @@ VISA_RANK = {
 # priority-2 country ranks as if it scored 5 points more.
 PRIORITY_BONUS = 5
 
+# Points (sorting only) for a company on / not found on the official sponsor
+# register of its country.
+REGISTER_BONUS = 5
+
 
 def sort_jobs(job_objects, priorities=None) -> None:
     """
@@ -458,7 +462,15 @@ def sort_jobs(job_objects, priorities=None) -> None:
 
     def score(job):
         base = job.ranking_score if job.ranking_score is not None else 0
-        return base + PRIORITY_BONUS * (priorities.get(job.country, 1) - 1)
+        base += PRIORITY_BONUS * (priorities.get(job.country, 1) - 1)
+
+        # Official sponsor register (UK, NL): a real signal either way.
+        if job.sponsor_register == "listed":
+            base += REGISTER_BONUS
+        elif job.sponsor_register == "not_listed" and job.visa_sponsorship_status != "yes":
+            base -= REGISTER_BONUS
+
+        return base
 
     job_objects.sort(
         key=lambda job: (

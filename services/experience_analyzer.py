@@ -36,6 +36,10 @@ class ExperienceAnalyzer:
             r"\bstudentische\w*\b",
             r"\bthesis\b",
             r"\babschlussarbeit\b",
+            # Dutch: "Stage/afstudeeropdracht", "Stage Software Developer"
+            r"\bstage\b",
+            r"\bstagiair\w*\b",
+            r"\bafstudeer\w*\b",
         ],
         "Mid": [
             r"\bmid[\s-]?level\b",

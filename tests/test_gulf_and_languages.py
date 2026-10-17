@@ -239,6 +239,21 @@ class TestNotSoftwareTitles(unittest.TestCase):
             self.assertEqual(job.application_bucket, "skip", title)
             self.assertIn("Not a software role", job.bucket_reason)
 
+    def test_volunteer_roles_are_skipped(self):
+        from sources.relevance import is_tech_title
+
+        self.assertFalse(is_tech_title("Charity Volunteer - Web Developer"))
+
+    def test_dutch_internships_are_interns(self):
+        from services.experience_analyzer import ExperienceAnalyzer
+
+        analyzer = ExperienceAnalyzer()
+        for title in ("Stage/afstudeeropdracht Full-stack Development", "Stage Software Developer",
+                      "Afstudeerstage Web Development"):
+            self.assertEqual(analyzer.extract_seniority(title), "Intern", title)
+
+        self.assertNotEqual(analyzer.extract_seniority("Backstage Platform Engineer"), "Intern")
+
     def test_software_titles_are_kept(self):
         for title in ("Web Developer / Web Designer (m/w/d)", "UX/UI Front-End Developer",
                       "Software Development Officer"):
