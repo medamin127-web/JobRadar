@@ -134,16 +134,15 @@ class SponsorRegister:
 # Words a company adds to its brand in its legal name. Anything else
 # ("kebab", "school", "accountants", "restaurant") means another company.
 GENERIC_COMPANY_WORDS = {
+    # Only words that add nothing to WHO the company is. Industry words
+    # ("media", "health", "capital", "studios", "consulting") are left out:
+    # "Picnic Media" is not Picnic, "Maximus Consulting" is not Maximus.
     "technologies", "technology", "tech", "software", "systems", "solutions",
-    "digital", "labs", "lab", "services", "service", "consulting", "consultancy",
-    "bank", "banking", "financial", "finance", "payments", "pay", "energy",
-    "energie", "global", "worldwide", "eu", "emea", "london", "amsterdam",
+    "digital", "labs", "lab", "services", "service", "bank", "banking",
+    "payments", "global", "worldwide", "eu", "emea", "london", "amsterdam",
     "dublin", "branch", "office", "netherlands", "nederland", "ireland",
-    "england", "britain", "british", "operations", "security", "platforms",
-    "platform", "networks", "network", "media", "health", "healthcare",
-    "online", "it", "ai", "analytics", "data", "cloud", "interactive",
-    "studios", "studio", "ventures", "capital", "markets", "trading",
-    "investments", "management", "europa", "benelux", "and",
+    "england", "britain", "british", "operations", "platforms", "platform",
+    "online", "europa", "benelux", "and",
 }
 
 

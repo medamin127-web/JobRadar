@@ -252,7 +252,7 @@ def print_details(job_objects) -> None:
         if job.sponsor_register:
             found = (
                 f"yes, as '{job.sponsor_register_name}'" if job.sponsor_register == "listed"
-                else "not found (check: the legal name may differ, e.g. Deliveroo = Roofoods Ltd)"
+                else "not found (check: the company may be registered under a different legal name)"
             )
             print(f"  {job.sponsor_register_title}: {found}")
         print(f"  Job language: {job.job_language} | Work mode: {job.work_mode} | Remote scope: {job.remote_scope}")

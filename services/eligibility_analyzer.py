@@ -681,9 +681,16 @@ HYBRID = re.compile(
 
 REMOTE_WORLDWIDE = re.compile(
     r"(?:remote|work)\W+(?:\w+\W+){0,6}(?:worldwide|anywhere|globally|any country|any location|all countries)"
-    r"|(?:worldwide|anywhere in the world|global)\W+(?:\w+\W+){0,3}remote"
+    r"|(?:worldwide|anywhere in the world|globally)\W+(?:\w+\W+){0,3}remote"
     r"|work from anywhere"
     r"|remote\W+(?:\w+\W+){0,3}(?:from )?(?:any|every) (?:country|location)",
+    re.IGNORECASE,
+)
+
+# A perk, not a remote job: "work from anywhere for up to 4 weeks a year".
+WORK_FROM_ANYWHERE_PERK = re.compile(
+    r"(?:work(?:ing)?|remote)\W+(?:\w+\W+){0,3}(?:anywhere|abroad)\W+(?:\w+\W+){0,3}?"
+    r"(?:\d+|one|two|three|four|six|several|a few)\s*(?:weeks?|days?|months?)",
     re.IGNORECASE,
 )
 
@@ -766,7 +773,7 @@ def analyze_remote(job: Job, text: str) -> dict:
 
     scope_text = f"{headline} {text}"
 
-    worldwide = bool(REMOTE_WORLDWIDE.search(scope_text))
+    worldwide = bool(REMOTE_WORLDWIDE.search(WORK_FROM_ANYWHERE_PERK.sub(" ", scope_text)))
     germany = bool(REMOTE_GERMANY_ONLY.search(scope_text))
     country = bool(REMOTE_COUNTRY_ONLY.search(scope_text))
     eu = bool(REMOTE_EU_ONLY.search(scope_text))

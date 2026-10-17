@@ -67,6 +67,7 @@ class TestMatching(unittest.TestCase):
             "Turing House School", "PASS (PORTABLE APPLIANCE SAFETY SERVICES) LTD",
             "ADYEN N.V. LONDON BRANCH", "Monzo Bank Ltd", "UK Wise Group Ltd",
             "Infor (Barneveld) B.V.", "Pigment Global Limited",
+            "Picnic Media", "Maximus Consulting Ltd", "Sardine Capital",
         ])
 
         for company in ("Picnic", "Sardine", "Maximus", "turing", "Pass Ltd"):

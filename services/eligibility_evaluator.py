@@ -7,7 +7,7 @@ A perfect technical match you cannot legally take is a "skip".
 """
 
 from countries import profile_of
-from sources.relevance import is_tech_title
+from sources.relevance import is_tech_title, is_unpaid_title
 from models import Job, Profile
 
 
@@ -290,6 +290,10 @@ class ApplicationBucketer:
         if status == "blocked":
             bucket = "skip"
             reason = "Blocked: " + ", ".join(job.eligibility_blockers)
+
+        elif is_unpaid_title(job.title):
+            bucket = "skip"
+            reason = "Volunteer / unpaid role."
 
         elif (
             job.title

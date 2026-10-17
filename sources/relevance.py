@@ -42,6 +42,15 @@ GENERIC_REMOTE = re.compile(
 )
 
 
+# Not a paid job at all, whatever the role: skipped even when the title
+# says "Web Developer".
+UNPAID_TITLE = re.compile(r"volunteer|vrijwillig|ehrenamt|\bunpaid\b", re.IGNORECASE)
+
+
+def is_unpaid_title(title) -> bool:
+    return bool(UNPAID_TITLE.search(title or ""))
+
+
 def is_tech_title(title) -> bool:
     title = str(title or "")
     return bool(TECH_TITLE.search(title)) and not NOT_TECH.search(title)

@@ -240,9 +240,16 @@ class TestNotSoftwareTitles(unittest.TestCase):
             self.assertIn("Not a software role", job.bucket_reason)
 
     def test_volunteer_roles_are_skipped(self):
-        from sources.relevance import is_tech_title
+        # The title says "Web Developer", so the role score is high: the
+        # unpaid check must not depend on it (it did, and the job stayed).
+        job = Job(title="Charity Volunteer - Web Developer", description=FILLER * 4, country="uk",
+                  role_match_score=90, target_category="good_target", match_score=62, match_coverage=80)
+        EligibilityAnalyzer.analyze(job)
+        EligibilityEvaluator.evaluate(job, you())
+        ApplicationBucketer.assign(job)
 
-        self.assertFalse(is_tech_title("Charity Volunteer - Web Developer"))
+        self.assertEqual(job.application_bucket, "skip")
+        self.assertIn("Volunteer", job.bucket_reason)
 
     def test_dutch_internships_are_interns(self):
         from services.experience_analyzer import ExperienceAnalyzer
@@ -361,3 +368,24 @@ class TestBoardPromotionIsNotTheEmployer(unittest.TestCase):
 
         self.assertIn("Looking to advance",
                       JobNormalizer.clean_description(self.AD, "linkedin"))
+
+
+class TestRemoteWorldwide(unittest.TestCase):
+
+    def scope(self, text, location="London"):
+        job = Job(title="Junior Software Engineer", location=location, description=text, is_remote=True)
+        EligibilityAnalyzer.analyze(job)
+        return job.remote_scope
+
+    def test_work_from_anywhere_perk_is_not_a_worldwide_job(self):
+        text = ("This is a remote role. Perks: work from anywhere for up to 4 weeks a year, "
+                "private health insurance. ") + FILLER
+        self.assertNotEqual(self.scope(text), "worldwide")
+
+    def test_a_global_company_is_not_a_worldwide_job(self):
+        text = "We are a global insurtech with remote-friendly teams. Fully remote role. " + FILLER
+        self.assertNotEqual(self.scope(text), "worldwide")
+
+    def test_real_worldwide_remote_still_counts(self):
+        text = "Fully remote position. You can work from anywhere in the world. " + FILLER
+        self.assertEqual(self.scope(text, location="Remote"), "worldwide")
