@@ -62,7 +62,7 @@ class TestMain(unittest.TestCase):
              "search_terms": ["Software Engineer"]}
         ]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
-        scraper.build_feeds = lambda known_ids=(): []
+        scraper.build_feeds = lambda known_ids=(), searched=None: []
         scraper.SITES = ["linkedin"]
 
         with tempfile.TemporaryDirectory() as directory:
@@ -109,7 +109,7 @@ class TestDatabaseRuns(unittest.TestCase):
             {"key": "testland", "name": "Testland", "location": "Testland", "search_terms": ["Dev"]}
         ]
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
-        scraper.build_feeds = lambda known_ids=(): []
+        scraper.build_feeds = lambda known_ids=(), searched=None: []
         scraper.SITES = ["linkedin"]
 
         self.original_cwd = os.getcwd()

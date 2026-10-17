@@ -110,7 +110,8 @@ Set in `config.py`:
 
 | Source | Setting | How it works |
 | --- | --- | --- |
-| LinkedIn, Indeed, Bayt (Glassdoor, Google possible) | `SITES` | JobSpy runs every search term on each site, in the countries whose profile lists that site |
+| LinkedIn, Indeed, Bayt, Glassdoor | `SITES` | JobSpy runs every search term on each site, in the countries whose profile lists that site (Bayt: Gulf only; Glassdoor: not in the Gulf) |
+| StepStone (Germany's biggest board) | `STEPSTONE_PAGES` | searches StepStone in the countries whose profile has a `stepstone` site, opens each new tech job once. Bot-protected: check with `python sources_check.py stepstone`; if refused, `pip install curl_cffi` |
 | Arbeitnow (German job board, free API) | `ARBEITNOW_PAGES` | reads the newest pages, keeps tech jobs |
 | Jaabz (jobs with visa sponsorship) | `JAABZ_PAGES` | reads its visa-sponsorship list for each of your countries, opens each new tech job once; the jobs count as "maybe visa" unless the ad says otherwise |
 | Relocate.me (jobs with a relocation package) | `RELOCATEME_PAGES` | reads its list pages, opens each new tech job once; "maybe visa" when the package includes visa services, else "relocation" |
@@ -128,6 +129,7 @@ python sources_check.py greenhouse n26 celonis
 python sources_check.py guesses               # try a starter list of companies
 python sources_check.py jaabz                 # read Jaabz for your countries
 python sources_check.py relocateme            # read Relocate.me
+python sources_check.py stepstone             # one StepStone search (bot protection test)
 python sources_check.py jaabz dump            # ... and save its HTML in data/samples
 ```
 
@@ -197,7 +199,8 @@ candidate_profile.py    YOUR profile (git-ignored)
 candidate_profile.example.py   template for the file above
 models/                 Job, Profile, WorkExperience, Language, CEFR helpers
 services/               analyzers (skills, experience, eligibility), matchers, scorer, classifier
-sources/                job sources: jobspy_source (LinkedIn, Indeed, Bayt), arbeitnow, jaabz, relocateme,
+sources/                job sources: jobspy_source (LinkedIn, Indeed, Bayt, Glassdoor), arbeitnow,
+                        jaabz, relocateme, stepstone,
                         greenhouse, lever; jsonld reads job pages (schema.org JobPosting)
 sources_check.py        test a source / company board from your computer
 tests/                  unit tests (they never use your real profile)

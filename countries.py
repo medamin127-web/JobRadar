@@ -9,7 +9,9 @@ Fields:
     name               shown in the report
     location           what LinkedIn / Indeed / Bayt are searched with
     indeed_country     Indeed's name for the country (None = no Indeed)
-    sites              search sites that make sense there (Bayt = Gulf only)
+    sites              search sites that make sense there (Bayt = Gulf only,
+                       Glassdoor = not in the Gulf)
+    stepstone          StepStone's site there (optional), stepstone_terms its searches
     location_keywords  a feed job (Jaabz, Arbeitnow, career pages) belongs
                        to this country when its location contains one
     local_language     the language employers may ask for
@@ -42,7 +44,13 @@ COUNTRY_PROFILES = {
         "jaabz": "germany",
         "location": "Germany",
         "indeed_country": "germany",
-        "sites": ["linkedin", "indeed"],
+        "sites": ["linkedin", "indeed", "glassdoor"],
+        # StepStone's site for this country, and what to search there.
+        "stepstone": "www.stepstone.de",
+        "stepstone_terms": [
+            "Full Stack Developer", "Software Engineer", "Web Developer",
+            "React Developer", "Backend Developer",
+        ],
         "local_language": "German",
         "visa_norm": "explicit",
         "location_keywords": [

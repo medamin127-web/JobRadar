@@ -201,7 +201,7 @@ class TestScraperRunsSitesPerCountry(unittest.TestCase):
         scraper.load_profile = make_profile
         scraper.SEARCH_CONFIGS = configs
         scraper.DELAY_BETWEEN_SEARCHES = (0, 0)
-        scraper.build_feeds = lambda known_ids=(): []
+        scraper.build_feeds = lambda known_ids=(), searched=None: []
         scraper.SITES = ["linkedin", "bayt"]
         scraper.COUNTRIES_PER_RUN = 1
 

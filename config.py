@@ -33,8 +33,10 @@ SEARCH_CONFIGS = search_configs(COUNTRIES, COUNTRY_PRIORITY)
 # ==================================================
 
 # Search sites, through JobSpy. A site runs only in the countries whose
-# profile lists it (Bayt is Gulf only). Possible: "linkedin", "indeed",
-# "bayt", "glassdoor", "google".
+# profile lists it (Bayt is Gulf only, Glassdoor not in the Gulf).
+# Possible: "linkedin", "indeed", "bayt", "glassdoor", "google".
+# Glassdoor refused every search from Tunisia (Oct 2026): off. Add it back
+# here to try again (e.g. from another connection).
 SITES = ["linkedin", "indeed", "bayt"]
 
 # Arbeitnow: a German job board with a free API (no search: JobRadar reads
@@ -57,6 +59,15 @@ JAABZ_PAGES = 2
 # Relocate.me: jobs that all come with a relocation package (visa help,
 # flight, moving money). Small board, mostly Europe. 0 = off.
 RELOCATEME_PAGES = 5
+
+# StepStone: Germany's biggest board, read in the countries whose profile
+# has a "stepstone" site (search pages per term, then each new tech job
+# once). It uses bot protection: check first with
+#   python sources_check.py stepstone
+# and if it is refused, try:  pip install curl_cffi   0 = off.
+# Off: StepStone blocks visitors from Tunisia, even in a normal browser
+# ("Access Denied", Oct 2026). Set to 1 to try again from elsewhere.
+STEPSTONE_PAGES = 0
 
 RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72

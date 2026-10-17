@@ -7,6 +7,7 @@ Check job sources from your computer before adding them to config.py.
     python sources_check.py guesses            try a starter list of companies
     python sources_check.py jaabz              read Jaabz (visa jobs) for your countries
     python sources_check.py relocateme         read Relocate.me (relocation jobs)
+    python sources_check.py stepstone          read StepStone (Germany), one search
     python sources_check.py jaabz dump         ... and save its HTML in data/samples
                                                (same for: relocateme dump)
 
@@ -23,6 +24,7 @@ import sys
 
 from config import ARBEITNOW_PAGES, GREENHOUSE_BOARDS, LEVER_COMPANIES, SEARCH_CONFIGS
 from sources import (
+    StepStoneSource,
     ArbeitnowSource,
     GreenhouseSource,
     JaabzSource,
@@ -161,6 +163,32 @@ def check_relocateme(output=print, dump=False, source=None):
     return check_board("relocateme", source, output, dump)
 
 
+def check_stepstone(output=print, dump=False, source=None):
+    from sources.http import browser_get
+
+    if source is None:
+        config = next((c for c in SEARCH_CONFIGS if c.get("stepstone")), None)
+
+        if config is None:
+            output("  No country in config.py has a StepStone site.")
+            return None
+
+        source = StepStoneSource(
+            domain=config["stepstone"], terms=["Full Stack Developer"],
+            country_key=config["key"], country_name=config["name"], max_pages=1,
+        )
+        output("  (looking like Chrome with curl_cffi)" if browser_get()
+               else "  (plain requests; if refused, try: pip install curl_cffi)")
+
+    result = check_board("stepstone", source, output, dump)
+
+    if result is None and not dump:
+        output("  Refused? Try:  pip install curl_cffi   then run this again.")
+        output("  Still refused: run  python sources_check.py stepstone dump  and send me the file.")
+
+    return result
+
+
 def save_samples(name, source, output=print):
     """Save a list page and one job page, to fix the parser if the site changes."""
 
@@ -172,6 +200,12 @@ def save_samples(name, source, output=print):
         slug = (source.countries or [("germany", "Germany")])[0][0]
         params = list_params(slug, 1)
         job_url = lambda link: f"{BASE}/jobs/{link[0]}-{link[1]}"
+    elif name == "stepstone":
+        from sources.stepstone import job_links
+
+        LIST_URL = source.search_url(source.terms[0] if source.terms else "software developer")
+        params = None
+        job_url = lambda link: f"{source.base}/stellenangebote--{link[1]}--{link[0]}-inline.html"
     else:
         from sources.relocateme import BASE, LIST_URL, job_links
 
@@ -222,6 +256,9 @@ def main(argv=None, output=print):
             run(kind, names)
     elif argv[0] == "jaabz":
         check_jaabz(output, dump="dump" in argv[1:])
+        return
+    elif argv[0] == "stepstone":
+        check_stepstone(output, dump="dump" in argv[1:])
         return
     elif argv[0] == "relocateme":
         check_relocateme(output, dump="dump" in argv[1:])

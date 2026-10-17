@@ -31,6 +31,7 @@ from config import (
     COUNTRIES_PER_RUN,
     COUNTRY_PRIORITY,
     RELOCATEME_PAGES,
+    STEPSTONE_PAGES,
     JAABZ_PAGES,
     DB_PATH,
     GREENHOUSE_BOARDS,
@@ -99,13 +100,33 @@ def build_source(site):
     return JobSpySource(sites=[site])
 
 
-def build_feeds(known_ids=()):
+def stepstone_sources(configs, known_ids=()):
+    """One StepStone source per country (searched this run) that has one."""
+
+    from sources import StepStoneSource
+
+    return [
+        StepStoneSource(
+            domain=config["stepstone"],
+            terms=config.get("stepstone_terms") or config["search_terms"],
+            country_key=config["key"],
+            country_name=config["name"],
+            max_pages=STEPSTONE_PAGES,
+            known_ids=known_ids,
+        )
+        for config in configs
+        if config.get("stepstone")
+    ]
+
+
+def build_feeds(known_ids=(), searched=None):
     from sources import (
         ArbeitnowSource,
         GreenhouseSource,
         JaabzSource,
         LeverSource,
         RelocateMeSource,
+        StepStoneSource,
     )
 
     feeds = []
@@ -122,6 +143,9 @@ def build_feeds(known_ids=()):
 
     if RELOCATEME_PAGES:
         feeds.append(RelocateMeSource(max_pages=RELOCATEME_PAGES, known_ids=known_ids))
+
+    if STEPSTONE_PAGES:
+        feeds += stepstone_sources(searched or SEARCH_CONFIGS, known_ids)
 
     feeds += [GreenhouseSource(board) for board in GREENHOUSE_BOARDS]
     feeds += [LeverSource(company) for company in LEVER_COMPANIES]
@@ -229,7 +253,8 @@ def scrape(configs, ranking=None, known_ids=()):
         ))
 
     # 2. Feeds (Arbeitnow, company career pages).
-    feeds = build_feeds(known_ids)
+    # StepStone is a country search: only for the countries searched now.
+    feeds = build_feeds(known_ids, searched=configs)
 
     if feeds:
         print("\n" + "#" * 60)

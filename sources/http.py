@@ -68,8 +68,34 @@ def get_json(url, params=None, get=None, retries=2, wait=5, sleep=time.sleep):
         raise FetchError(f"not JSON: {url}")
 
 
-def get_html(url, params=None, get=None, retries=2, wait=5, sleep=time.sleep) -> str:
-    """GET a web page and return its HTML."""
+def browser_get():
+    """
+    curl_cffi's get, which copies Chrome's network fingerprint (some sites,
+    StepStone for one, refuse plain Python requests). None when curl_cffi
+    is not installed:  pip install curl_cffi
+    """
+
+    try:
+        from curl_cffi import requests as curl_requests
+    except ImportError:
+        return None
+
+    def get(url, params=None, timeout=30, headers=None):
+        return curl_requests.get(url, params=params, timeout=timeout, headers=headers,
+                                 impersonate="chrome")
+
+    return get
+
+
+def get_html(url, params=None, get=None, retries=2, wait=5, sleep=time.sleep,
+             browser_like=False) -> str:
+    """
+    GET a web page and return its HTML. browser_like: use curl_cffi when it
+    is installed (looks like Chrome), else plain requests.
+    """
+
+    if get is None and browser_like:
+        get = browser_get()
 
     response = _fetch(url, params, get, retries, wait, sleep, BROWSER_HEADERS)
 

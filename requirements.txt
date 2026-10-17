@@ -1,3 +1,6 @@
 pandas==3.0.6
 python-jobspy==1.3.0
 requests>=2.31
+
+# Optional: only if StepStone refuses plain requests (python sources_check.py stepstone)
+# curl_cffi

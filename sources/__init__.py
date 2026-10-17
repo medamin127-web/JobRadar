@@ -4,6 +4,7 @@ from .greenhouse import GreenhouseSource
 from .jaabz import JaabzSource
 from .lever import LeverSource
 from .relocateme import RelocateMeSource
+from .stepstone import StepStoneSource
 
 __all__ = [
     "JobSource",
@@ -12,6 +13,7 @@ __all__ = [
     "JaabzSource",
     "LeverSource",
     "RelocateMeSource",
+    "StepStoneSource",
     "JobSpySource",
 ]
 
