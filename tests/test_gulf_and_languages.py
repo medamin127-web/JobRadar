@@ -297,6 +297,10 @@ class TestBoardPromotionIsNotTheEmployer(unittest.TestCase):
         "Searching for Development & Programming roles that provide visa sponsorship?\n"
         "Looking to advance your Development & Programming career with relocation support?\n"
         "Jaabz lists thousands of jobs with visa sponsorship and relocation.\n"
+        "Explore our comprehensive directory of visa sponsorship jobs from employers worldwide "
+        "who are ready to sponsor talented international professionals.\n"
+        "Discover our full range of relocation jobs with comprehensive support packages "
+        "to help you relocate and settle in your new location.\n"
     )
 
     def test_promotion_lines_do_not_count_as_visa_or_relocation(self):
@@ -326,6 +330,16 @@ class TestBoardPromotionIsNotTheEmployer(unittest.TestCase):
 
         self.assertNotIn("Looking to advance", cleaned)
         self.assertEqual(cleaned.count("We build React apps."), 10)
+
+    def test_employer_statements_stay(self):
+        from sources.jsonld import remove_site_promotion
+
+        for line in ("Work permit assistance",
+                     "Visa sponsorship may be considered for exceptional candidates.",
+                     "Full immigration and relocation support for UAE move",
+                     "We offer relocation support and visa sponsorship.",
+                     "We are hiring for multiple remote roles across Europe"):
+            self.assertEqual(remove_site_promotion(line), line)
 
     def test_other_sites_are_left_alone(self):
         from services.normalizer import JobNormalizer

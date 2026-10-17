@@ -92,6 +92,12 @@ def check_board(name, source, output=print, dump=False):
         f"{stats.get('opened', 0)} opened, {stats.get('structured', 0)} with full details"
     )
 
+    if name == "jaabz" and stats.get("opened"):
+        output(
+            f"  full text from the original posting (LinkedIn...): {stats.get('full_text', 0)}, "
+            f"refused: {stats.get('originals_refused', 0)} (those keep Jaabz's short excerpt)"
+        )
+
     if stats.get("listed", 0) == 0:
         output(f"  No job links found: the page layout changed. Run: python sources_check.py {name} dump")
         output("  and send me the files in data/samples.")

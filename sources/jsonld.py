@@ -151,6 +151,12 @@ SITE_PROMOTION = re.compile(
     r"^(?:searching for|looking for|interested in)\b.{0,80}\b(?:roles?|jobs?|positions?|opportunities)\b.{0,40}"
     r"(?:visa|relocation|sponsor)"
     r"|^looking to (?:advance|grow|boost|take)\b.{0,80}\bcareer\b"
+    r"|^(?:explore|discover|browse|find|search|check out|see)\b.{0,60}\b(?:jobs|roles|positions|openings|listings|directory)\b"
+    # A sentence about "visa sponsorship jobs" / "relocation jobs" describes
+    # the board's listings, never one employer's offer.
+    r"|\b(?:visa[- ]sponsorship|visa[- ]sponsored|relocation|sponsored)\s+(?:jobs|roles|positions|opportunities)\b"
+    r"|\bjobs\s+(?:with|offering|that (?:offer|provide))\s+(?:visa|relocation)"
+    r"|\bemployers?\s+(?:worldwide|around the world|who are ready to sponsor)"
     r"|jaabz|^(?:sign up|log ?in|unlock job details|apply now|share this job)\b",
     re.IGNORECASE,
 )

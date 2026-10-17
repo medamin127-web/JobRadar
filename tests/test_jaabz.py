@@ -35,6 +35,54 @@ def job_page(title="Backend Engineer", company="Torentify", country="NL", city="
     )
 
 
+def real_layout_page(visa="active", relocation="inactive"):
+    """A trimmed copy of a real Jaabz job page (October 2026)."""
+
+    def badge(state, icon, name):
+        check = '<i class="fas fa-check-circle benefit-check-icon"></i>' if state == "active" else ""
+        return (f'<span class="benefit-tag {state}" itemprop="jobBenefits">'
+                f'<i class="fas {icon}"></i><span>{name}</span>{check}</span>')
+
+    return (
+        "<html><body><h1>Backend Engineer</h1>"
+        '<div class="category-box-description"><p>Looking to advance your Development career with '
+        "relocation support? Explore our Development Jobs with Relocation Packages.</p></div>"
+        '<div class="category-box-description"><p>Explore our comprehensive directory of visa '
+        "sponsorship jobs from employers worldwide who are ready to sponsor.</p></div>"
+        '<h3 class="content-card-title">Job Description</h3>'
+        '<div class="content-single description-excerpt">'
+        "Acme builds payment software in Doha with Node.js and React.</div>"
+        '<div class="source-readmore"><a class="source-readmore-btn"\n'
+        '   href="https://sa.linkedin.com/jobs/view/backend-engineer-at-acme-4476406369" target="_blank">'
+        "Continue on LinkedIn</a></div>"
+        '<div class="benefits-section">'
+        + badge(visa, "fa-passport", "Visa Sponsorship")
+        + badge(relocation, "fa-plane-departure", "Relocation")
+        + badge("inactive", "fa-house-laptop", "Remote")
+        + "</div>"
+        '<div class="job-details-full ">'
+        '<div class="detail-full-item"><span class="detail-label"><i></i>Job Type</span>'
+        '<span class="detail-value">Full-time</span></div>'
+        '<div class="detail-full-item"><span class="detail-label"><i></i>Experience Level</span>'
+        '<span class="detail-value">Mid-Senior</span></div></div>'
+        # another job, further down
+        '<div class="job-details-full premium-hidden">'
+        '<span class="benefit-tag active" itemprop="jobBenefits"><i></i><span>Relocation</span></span>'
+        '<div class="detail-full-item"><span class="detail-label">Job Type</span>'
+        '<span class="detail-value">Part-time</span></div></div>'
+        "</body></html>"
+    )
+
+
+def linkedin_page():
+    return (
+        '<html><body><div class="show-more-less-html__markup">'
+        "<p>Full LinkedIn description: we build payments with Node.js, React and PostgreSQL.</p>"
+        "<ul><li>2+ years of experience</li><li>Visa and relocation provided</li></ul>"
+        "</div></body></html>"
+    )
+
+
 class Response:
     def __init__(self, text, status=200):
         self.text = text
@@ -126,22 +174,57 @@ class TestParseJobPage(unittest.TestCase):
 
 class TestJaabzSource(unittest.TestCase):
 
-    def test_short_summary_replaced_by_the_page_text(self):
-        page = job_page().replace(
-            "<h1>ignored</h1>",
-            "<h1>Backend Engineer</h1><p>" + "Full description with visa sponsorship details. " * 40 + "</p>",
-        )
-        pages = {
-            "jobs?qatar&page=1": list_page("/jobs/1-backend-engineer"),
-            "/jobs/1-backend-engineer": page,
-        }
-        jobs = self.source(pages, max_pages=1).fetch()
-
-        self.assertGreater(len(jobs.iloc[0]["description"]), 1000)
-        self.assertEqual(jobs.iloc[0]["company"], "Torentify")   # still from the JobPosting
-
     def source(self, pages, countries=(("qatar", "Qatar"),), **kwargs):
         return JaabzSource(list(countries), get=fake_get(pages), sleep=lambda _: None, **kwargs)
+
+    def test_excerpt_badges_and_full_text_from_linkedin(self):
+        pages = {
+            "jobs?qatar&page=1": list_page("/jobs/1-backend-engineer"),
+            "/jobs/1-backend-engineer": real_layout_page(),
+            "linkedin.com/jobs/view/4476406369": linkedin_page(),
+        }
+        source = self.source(pages, max_pages=1)
+        jobs = source.fetch()
+        job = jobs.iloc[0]
+
+        self.assertIn("Full LinkedIn description", job["description"])
+        self.assertIn("Experience Level: Mid-Senior", job["description"])
+        self.assertNotIn("Explore our", job["description"])
+        self.assertNotIn("Looking to advance", job["description"])
+        self.assertEqual(job["job_url_direct"],
+                         "https://sa.linkedin.com/jobs/view/backend-engineer-at-acme-4476406369")
+        self.assertEqual(job["source_hint"], "visa")
+        self.assertEqual(source.stats["full_text"], 1)
+
+    def test_linkedin_refuses_the_excerpt_is_kept(self):
+        pages = {
+            "jobs?qatar&page=1": list_page("/jobs/1-backend-engineer"),
+            "/jobs/1-backend-engineer": real_layout_page(),
+            "linkedin.com/jobs/view/4476406369": Response("", status=429),
+        }
+        source = self.source(pages, max_pages=1)
+        job = source.fetch().iloc[0]
+
+        self.assertTrue(job["description"].startswith("Acme builds payment software"))
+        self.assertNotIn("Explore our", job["description"])
+        self.assertEqual(source.stats["originals_refused"], 1)
+
+    def test_only_active_badges_count(self):
+        from sources.jaabz import read_job_page, source_hint_from
+
+        page = real_layout_page(visa="inactive", relocation="active")
+        badges = read_job_page(page)["badges"]
+
+        self.assertEqual(badges, {"Visa Sponsorship": False, "Relocation": True, "Remote": False})
+        self.assertEqual(source_hint_from(badges), "relocation")
+        self.assertIsNone(source_hint_from({"Visa Sponsorship": False, "Relocation": False}))
+
+    def test_other_jobs_on_the_page_are_ignored(self):
+        from sources.jaabz import read_job_page
+
+        details = read_job_page(real_layout_page())
+
+        self.assertEqual(details["details"], {"Job Type": "Full-time", "Experience Level": "Mid-Senior"})
 
     def test_reads_tech_jobs_and_marks_them_visa(self):
         pages = {
