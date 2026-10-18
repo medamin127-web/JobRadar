@@ -181,7 +181,7 @@ LEVEL_KEYWORDS = [
     (
         re.compile(
             r"sehr gute?[rsn]?|very good|strong|\bgood\b|\bgute[rsn]?\b|\bsolid\b"
-            r"|conversational|intermediate|working knowledge|gesprächssicher",
+            r"|conversational|intermediate|working knowledge|gesprächssicher|business[- ]level",
             re.I,
         ),
         4,
@@ -196,6 +196,10 @@ LEVEL_KEYWORDS = [
 ]
 
 CEFR_TOKEN = re.compile(r"\b([ABC][12])\b")
+
+# Japanese levels: JLPT N1 (hardest) .. N5, on the CEFR scale used here.
+JLPT_TOKEN = re.compile(r"\b(?:jlpt\s*)?N([1-5])\b", re.IGNORECASE)
+JLPT_VALUES = {"1": 5, "2": 4, "3": 3, "4": 2, "5": 1}
 
 
 SHARED_FILLER = {
@@ -251,6 +255,10 @@ def _nearest_level(
     cefr = [
         (distance(m.start(), m.end()), CEFR_VALUES[m.group(1)])
         for m in CEFR_TOKEN.finditer(window)
+        if usable(m.start(), m.end())
+    ] + [
+        (distance(m.start(), m.end()), JLPT_VALUES[m.group(1)])
+        for m in JLPT_TOKEN.finditer(window)
         if usable(m.start(), m.end())
     ]
 
@@ -432,7 +440,9 @@ VISA_TOPIC = re.compile(
     r"|employment permit|stamp\s*(?:4|1g)|settled status|indefinite leave"
     # Canada, Austria, Switzerland
     r"|canadian citizen|permanent residen\w+|\blmia\b|red[- ]white[- ]red|rot[- ]weiß[- ]rot"
-    r"|\brwr\b|swiss (?:work )?permit|\b(?:b|c|g) permit|eu/efta",
+    r"|\brwr\b|swiss (?:work )?permit|\b(?:b|c|g) permit|eu/efta"
+    # Malta, Japan, Sweden
+    r"|single permit|key employee initiative|certificate of eligibility|arbetstillstånd",
     re.IGNORECASE,
 )
 
@@ -470,7 +480,8 @@ POSITIVE_VERBS = re.compile(
 _PERMITS = (
     r"(?:visa|work permit|blue card|skilled worker|highly skilled migrant|kennismigrant"
     r"|critical skills|employment permit|lmia|red[- ]white[- ]red card|rot[- ]weiß[- ]rot[- ]karte"
-    r"|rwr[- ]karte|rwr card)"
+    r"|rwr[- ]karte|rwr card|single permit|key employee initiative|certificate of eligibility"
+    r"|arbetstillstånd)"
 )
 
 SPONSOR_TERM = re.compile(
@@ -484,7 +495,8 @@ SUPPORT_VISA = re.compile(
     r"(?:support|assist|help|unterstütz\w*|begleit\w*|kümmern\w*)\W+(?:\w+\W+){0,6}"
     r"(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|arbeitsgenehmigung|blue card|blaue karte|einreise"
     r"|employment permit|critical skills|highly skilled migrant|kennismigrant|skilled worker"
-    r"|lmia|red[- ]white[- ]red card|rot[- ]weiß[- ]rot[- ]karte|rwr[- ]karte)"
+    r"|lmia|red[- ]white[- ]red card|rot[- ]weiß[- ]rot[- ]karte|rwr[- ]karte"
+    r"|single permit|certificate of eligibility|arbetstillstånd)"
     r"|(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|blue card|blaue karte)\W+(?:\w+\W+){0,4}"
     r"(?:support|assistance|unterstützung|unterstützen|übernehmen|help)",
     re.IGNORECASE,
@@ -536,7 +548,8 @@ WORK_AUTH_REQUIRED = compile_all([
     "(?:" + _AUTH_WORDS + r")\s+(?:\w+\s+){0,5}(?:is |are |ist |sind )?"
     r"(?:required|mandatory|needed|necessary|erforderlich|notwendig|vorausgesetzt|zwingend|nachzuweisen)",
     r"(?:authori[sz]ed|eligible|legally (?:allowed|permitted|entitled)|allowed|permitted) to work (?:in|within) (?:the )?(?:germany|eu|europe|european union|uk|united kingdom|ireland|netherlands|eea"
-    r"|canada|austria|österreich|switzerland|schweiz|eu/efta)",
+    r"|canada|austria|österreich|switzerland|schweiz|eu/efta"
+    r"|malta|poland|estonia|lithuania|sweden|japan|czechia|czech republic|romania)",
     r"\beu[- ]?(?:citizens?|nationals?)\s+(?:\w+\s+){0,3}(?:only|required)"
     r"|\bonly\s+(?:\w+\s+){0,2}eu[- ]?(?:citizens?|nationals?)"
     r"|\bnur\s+(?:\w+\s+){0,2}eu[- ]?b(?:ü|u)rger",
@@ -714,11 +727,13 @@ REMOTE_GERMANY_ONLY = re.compile(
 REMOTE_COUNTRY_ONLY = re.compile(
     r"(?:remote|home ?office|work from home|wfh)\W+(?:\w+\W+){0,6}(?:within|in|from|inside|only)\W+(?:the\W+)?"
     r"(?:uk|united kingdom|england|netherlands|nederland|ireland|uae|united arab emirates|saudi arabia|ksa|qatar"
-    r"|canada|austria|österreich|switzerland|schweiz|kuwait|oman)\b"
+    r"|canada|austria|österreich|switzerland|schweiz|kuwait|oman"
+    r"|malta|poland|estonia|lithuania|sweden|japan|czechia|czech republic|romania)\b"
     r"|(?:based|located|living|residing|resident|residents)\W+(?:\w+\W+){0,4}(?:the\W+)?"
-    r"(?:uk|united kingdom|netherlands|ireland|canada|austria|switzerland)\b"
+    r"(?:uk|united kingdom|netherlands|ireland|canada|austria|switzerland"
+    r"|malta|poland|estonia|lithuania|sweden|japan|czechia|czech republic|romania)\b"
     r"|\bremote\s*[-–(]\s*(?:uk|united kingdom|netherlands|nl|ireland|ie|canada|ca|austria|at|switzerland|ch)\b"
-    r"|\b(?:uk|netherlands|ireland|canada|austria|switzerland)[- ](?:based|remote)\b"
+    r"|\b(?:uk|netherlands|ireland|canada|austria|switzerland|poland|sweden|japan)[- ](?:based|remote)\b"
     r"|österreichweit|schweizweit",
     re.IGNORECASE,
 )
@@ -875,7 +890,7 @@ _NOT_A_LANGUAGE = (
     r"(?!\W+(?:law|laws|market\w*|compan\w+|clients?|customers?|government"
     r"|nationals?|citizens?|nationality|content|localization|localisation"
     r"|rtl|nlp|text|fonts?|interfaces?|ui|websites?|apps?|version|speaking market"
-    r"|cuisine|food|team|office|entity|subsidiary|tech|riviera|alps)\b)"
+    r"|cuisine|food|team|office|entity|subsidiary|tech|riviera|alps|republic)\b)"
 )
 
 LANGUAGE_TERMS = {
@@ -893,7 +908,15 @@ LANGUAGE_TERMS = {
     "Russian": r"\brussian\b",
     "Hindi": r"\bhindi\b",
     "Urdu": r"\burdu\b",
-    "Japanese": r"\bjapanese\b",
+    "Japanese": r"\bjapanese\b|日本語|\bjlpt\b|\bnihongo\b",
+    # Capital P only: "polish the UI" is not the language.
+    "Polish": r"(?-i:\bPolish\b)|\bpolski\b|\bpolnisch\b",
+    "Estonian": r"\bestonian\b|\beesti keel\w*",
+    "Lithuanian": r"\blithuanian\b|\blietuvių\b",
+    "Latvian": r"\blatvian\b",
+    "Czech": r"\bczech\b|\bčeština\b|\bcestina\b|tschechisch",
+    "Romanian": r"\bromanian\b|\broman[aă]\b|rumänisch",
+    "Maltese": r"\bmaltese\b",
     "Mandarin": r"\bmandarin\b|\bchinese\b",
     "Korean": r"\bkorean\b",
     "Hebrew": r"\bhebrew\b",
@@ -915,14 +938,14 @@ ANY_LANGUAGE = re.compile(
 LANGUAGE_CUES = re.compile(
     r"speak|speaker|speaking|fluen|proficien|native|mother tongue|bilingual"
     r"|language|written|spoken|verbal|communication|command of|knowledge of"
-    r"|\blevel\b|\b[abc][12]\b|skills?\b|kenntnis|sprach"
+    r"|\blevel\b|\b[abc][12]\b|skills?\b|kenntnis|sprach|\bjlpt\b|\bn[1-5]\b"
     r"|إجادة|يشترط|مطلوب|طلاقة|اللغة",
     re.IGNORECASE,
 )
 
 LANGUAGE_REQUIRED_CUES = re.compile(
     r"\bmust\b|required|mandatory|essential|necessary|\bneed|fluen|proficien"
-    r"|native|mother tongue|bilingual|excellent|strong|good|\b[abc][12]\b"
+    r"|native|mother tongue|bilingual|excellent|strong|good|\b[abc][12]\b|\bn[1-5]\b|business[- ]level"
     r"|erforderlich|vorausgesetzt|يشترط|مطلوب|إجادة|طلاقة",
     re.IGNORECASE,
 )
@@ -1005,7 +1028,55 @@ def analyze_other_languages(text: str) -> dict:
                         "evidence": snippet(sentence),
                     }
 
+    # A listing written in Japanese, Polish or Swedish expects you to
+    # read and work in that language, even when it never says so.
+    written = written_in_language(text)
+
+    if written and found.get(written, {}).get("requirement") != "required":
+        found[written] = {
+            "requirement": "required",
+            "level_value": 5,
+            "evidence": f"The listing is written in {written}.",
+        }
+
     return found
+
+
+# Common words that only appear in a text written in that language.
+_WRITTEN_WORDS = {
+    "Polish": {
+        "się", "oraz", "dla", "jest", "nie", "jako", "oferujemy", "wymagania",
+        "znajomość", "doświadczenie", "pracy", "praca", "będzie", "który",
+        "która", "które", "zespołu", "zakres", "obowiązków",
+    },
+    "Swedish": {
+        "och", "att", "för", "är", "inom", "tjänsten", "erfarenhet", "arbeta",
+        "kommer", "söker", "hos", "våra", "ditt", "eller", "också", "kunskap",
+        "arbetar", "vår",
+    },
+}
+
+_KANA_KANJI = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+
+
+def written_in_language(text) -> Optional[str]:
+    """"Japanese", "Polish", "Swedish" when the listing is written in it."""
+
+    text = str(text or "")
+
+    if len(_KANA_KANJI.findall(text)) >= 80:
+        return "Japanese"
+
+    tokens = re.findall(r"[^\W\d_]+", text.lower())
+    english = sum(1 for t in tokens if t in EN_WORDS)
+
+    for name, words in _WRITTEN_WORDS.items():
+        hits = sum(1 for t in tokens if t in words)
+
+        if hits >= 12 and hits > english:
+            return name
+
+    return None
 
 
 # ==================================================
@@ -1018,7 +1089,9 @@ _GULF_PEOPLE = (
 _GULF_PLACES = (
     r"(?:the\s+)?(?:uae|u\.a\.e\.?|united arab emirates|dubai|abu dhabi|sharjah"
     r"|saudi arabia|ksa|the kingdom|riyadh|jeddah|dammam|khobar|qatar|doha"
-    r"|kuwait|oman|muscat|bahrain|manama|gcc|middle east)"
+    r"|kuwait|oman|muscat|bahrain|manama|gcc|middle east"
+    # Japan ads often want people already living there.
+    r"|japan|tokyo|osaka)"
 )
 
 NATIONALS_ONLY = compile_all([
@@ -1041,7 +1114,7 @@ NATIONALS_PREFERRED = re.compile(
 IN_COUNTRY_ONLY = compile_all([
     r"(?:candidates?|applicants?|only)\s+(?:\w+\s+){0,3}(?:currently\s+)?(?:based|residing|living|located|present)\s+in\s+"
     + _GULF_PLACES + r"\W+(?:\w+\W+){0,2}(?:only|can apply|will be considered|need apply)",
-    r"(?:must|should)\s+(?:\w+\s+){0,2}currently\s+(?:be\s+)?(?:based|residing|living|located|present)\s+in\s+" + _GULF_PLACES,
+    r"(?:must|should)\s+(?:\w+\s+){0,2}(?:currently|already)\s+(?:be\s+)?(?:based|residing|reside|living|live|located|present)\s+in\s+" + _GULF_PLACES,
     r"\bin[- ]country\s+(?:candidates?|applicants?|hires?|only)",
     r"\blocal\s+(?:candidates?|applicants?|hires?)\s+only|only\s+local\s+(?:candidates?|applicants?)",
     r"transferr?able\s+(?:iqama|visa|residence)",

@@ -195,6 +195,161 @@ COUNTRY_PROFILES = {
         ],
     },
 
+    "malta": {
+        "name": "Malta",
+        "jaabz": "malta",
+        "location": "Malta",
+        "indeed_country": "malta",
+        "sites": ["linkedin"],           # Indeed found nothing here (Oct 2026)
+        # English is an official language; Maltese is almost never asked.
+        "local_language": "English",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "malta", "valletta", "sliema", "st julian's", "st. julian's",
+            "saint julian's", "san giljan", "gzira", "msida", "birkirkara",
+            "mriehel", "san gwann", "swieqi", "ta' xbiex", "qormi", "mosta",
+            "pieta", "floriana", "gozo",
+        ],
+        # Online gaming (iGaming) and fintech are the big tech employers.
+        "search_terms": BASE_TERMS + [
+            "Software Developer iGaming",
+            "Software Engineer visa sponsorship",
+        ],
+    },
+
+    "poland": {
+        "name": "Poland",
+        "jaabz": "poland",
+        "location": "Poland",
+        "indeed_country": "poland",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Polish",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "poland", "polska", "warsaw", "warszawa", "krakow", "kraków",
+            "cracow", "wroclaw", "wrocław", "gdansk", "gdańsk", "gdynia",
+            "sopot", "poznan", "poznań", "lodz", "łódź", "katowice",
+            "szczecin", "lublin", "bialystok", "białystok", "rzeszow",
+            "rzeszów", "bydgoszcz", "torun", "toruń", "gliwice",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer relocation",
+        ],
+    },
+
+    "czechia": {
+        "name": "Czechia",
+        "jaabz": "czech-republic",
+        "location": "Czechia",
+        "indeed_country": "czech republic",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Czech",
+        "visa_norm": "explicit",
+        # Most non-EU hires come on the Employee Card; the EU Blue Card
+        # needs a higher salary.
+        "location_keywords": [
+            "czechia", "czech republic", "česko", "česká republika", "prague",
+            "praha", "brno", "ostrava", "plzen", "plzeň", "olomouc", "liberec",
+            "hradec kralove", "hradec králové", "pardubice", "zlin", "zlín",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer relocation",
+        ],
+    },
+
+    # Ready, not in COUNTRIES: work permits for non-EU workers were frozen for
+    # months in 2026 and IT employers rarely use them.
+    "romania": {
+        "name": "Romania",
+        "jaabz": "romania",
+        "location": "Romania",
+        "indeed_country": "romania",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Romanian",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "romania", "românia", "bucharest", "bucurești", "bucuresti",
+            "cluj-napoca", "cluj", "iasi", "iași", "timisoara", "timișoara",
+            "brasov", "brașov", "sibiu", "oradea", "constanta", "constanța",
+            "craiova",
+        ],
+        "search_terms": BASE_TERMS + ["Software Engineer relocation"],
+    },
+
+    "estonia": {
+        "name": "Estonia",
+        "jaabz": "estonia",
+        "location": "Estonia",
+        "indeed_country": "estonia",
+        "sites": ["linkedin"],           # Indeed found nothing here (Oct 2026)
+        "local_language": "Estonian",
+        "visa_norm": "explicit",
+        "location_keywords": ["estonia", "eesti", "tallinn", "tartu", "pärnu", "parnu", "narva"],
+        "search_terms": BASE_TERMS + ["Software Engineer relocation"],
+    },
+
+    "lithuania": {
+        "name": "Lithuania",
+        "jaabz": "lithuania",
+        "location": "Lithuania",
+        "indeed_country": "lithuania",
+        "sites": ["linkedin"],           # Indeed found nothing here (Oct 2026)
+        "local_language": "Lithuanian",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "lithuania", "lietuva", "vilnius", "kaunas", "klaipeda", "klaipėda",
+            "siauliai", "šiauliai", "panevezys", "panevėžys",
+        ],
+        "search_terms": BASE_TERMS + ["Software Engineer relocation"],
+    },
+
+    "sweden": {
+        "name": "Sweden",
+        "jaabz": "sweden",
+        "location": "Sweden",
+        "indeed_country": "sweden",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Swedish",
+        "visa_norm": "explicit",
+        "location_keywords": [
+            "sweden", "sverige", "stockholm", "gothenburg", "göteborg", "goteborg",
+            "malmö", "malmo", "uppsala", "linköping", "linkoping", "lund",
+            "västerås", "vasteras", "örebro", "orebro", "umeå", "umea",
+            "helsingborg", "jönköping", "jonkoping", "norrköping", "karlskrona",
+            "solna", "kista",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer relocation",
+        ],
+    },
+
+    # ------------------------------------------------------------ Asia
+
+    "japan": {
+        "name": "Japan",
+        "jaabz": "japan",
+        "location": "Japan",
+        "indeed_country": "japan",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "Japanese",
+        "visa_norm": "explicit",
+        # English searches find the English-speaking teams; ads written in
+        # Japanese or asking for JLPT N1/N2 are marked as needing Japanese.
+        "location_keywords": [
+            "japan", "tokyo", "osaka", "kyoto", "yokohama", "fukuoka", "nagoya",
+            "sapporo", "kobe", "sendai", "shibuya", "shinjuku", "minato",
+            "chiyoda", "shinagawa", "roppongi", "meguro",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Software Engineer English",
+            "Frontend Engineer",
+            "Software Engineer visa sponsorship",
+        ],
+    },
+
     # ------------------------------------------------------------ North America
 
     "canada": {

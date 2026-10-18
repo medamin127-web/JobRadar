@@ -1,4 +1,5 @@
-"""Canada, Austria, Switzerland, Kuwait, Oman."""
+"""Canada, Austria, Switzerland, Kuwait, Oman, Malta, Poland, Estonia,
+Lithuania, Sweden, Japan."""
 
 import unittest
 
@@ -8,7 +9,10 @@ from countries import COUNTRY_PROFILES, country_of_location, search_configs, ski
 from sources.relevance import in_country, in_target_countries
 from tests.test_gulf_and_languages import FILLER, evaluate
 
-ALL = search_configs(["uk", "netherlands", "germany", "austria", "switzerland", "canada", "kuwait", "oman"])
+ALL = search_configs([
+    "uk", "netherlands", "germany", "austria", "switzerland", "canada", "kuwait", "oman",
+    "malta", "poland", "estonia", "lithuania", "sweden", "japan",
+])
 
 
 class TestWhereAJobIs(unittest.TestCase):
@@ -107,12 +111,110 @@ class TestLocalVisaWording(unittest.TestCase):
             self.assertIn("EMPLOYER_VISA_IS_THE_NORM_THERE", job.eligibility_positives, key)
 
 
+class TestSecondBatch(unittest.TestCase):
+
+    def test_cities(self):
+        for location, key in (
+            ("St. Julian's, Malta", "malta"), ("Sliema", "malta"),
+            ("Kraków, Lesser Poland, Poland", "poland"), ("Warszawa", "poland"),
+            ("Tallinn, Harjumaa, Estonia", "estonia"), ("Vilnius", "lithuania"),
+            ("Göteborg, Sweden", "sweden"), ("Malmö", "sweden"),
+            ("Shibuya, Tokyo, Japan", "japan"), ("Osaka", "japan"),
+        ):
+            self.assertEqual(country_of_location(location, ALL), key, location)
+
+    def test_japanese_level_required(self):
+        job = evaluate(FILLER + "Japanese language skills at JLPT N2 level or above are required. " + FILLER,
+                       country="japan", location="Tokyo")
+
+        self.assertEqual(job.other_languages["Japanese"]["requirement"], "required")
+        self.assertEqual(job.other_languages["Japanese"]["level_value"], 4)
+        self.assertIn("JAPANESE_REQUIRED", job.eligibility_blockers)
+
+    def test_japanese_not_required(self):
+        job = evaluate(FILLER + "Japanese is not required; our team works in English. " + FILLER,
+                       country="japan", location="Tokyo")
+
+        self.assertEqual(job.other_languages["Japanese"]["requirement"], "not_required")
+
+    def test_listing_written_in_japanese(self):
+        text = "当社はウェブアプリケーションを開発するソフトウェア会社です。フロントエンドエンジニアを募集しています。" * 3
+        job = evaluate(text + " React TypeScript", country="japan", location="Tokyo")
+
+        self.assertEqual(job.other_languages["Japanese"]["requirement"], "required")
+
+    def test_listing_written_in_polish_or_swedish(self):
+        polish = ("Oferujemy pracę w zespole, który rozwija aplikacje. Wymagania: doświadczenie jako "
+                  "programista, znajomość React oraz Node. Zakres obowiązków jest szeroki i nie "
+                  "będzie nudno, praca dla ciebie jest tutaj, która daje rozwój zespołu. ") * 2
+        swedish = ("Vi söker en utvecklare som vill arbeta hos oss och är nyfiken. Du kommer att "
+                   "arbeta inom vårt team för att bygga tjänsten, och erfarenhet av React eller "
+                   "Node är också bra. Vår kunskap och ditt engagemang. ") * 2
+
+        self.assertEqual(evaluate(polish, country="poland", location="Warszawa")
+                         .other_languages["Polish"]["requirement"], "required")
+        self.assertEqual(evaluate(swedish, country="sweden", location="Stockholm")
+                         .other_languages["Swedish"]["requirement"], "required")
+
+    def test_polish_the_verb_is_not_the_language(self):
+        job = evaluate(FILLER + "You will polish UI skills and must have strong React skills. " + FILLER,
+                       country="poland", location="Warsaw")
+
+        self.assertNotIn("Polish", job.other_languages or {})
+
+    def test_english_listing_is_not_marked_foreign(self):
+        job = evaluate(FILLER * 6, country="sweden", location="Stockholm")
+        self.assertNotIn("Swedish", job.other_languages or {})
+
+    def test_must_already_live_in_japan(self):
+        job = evaluate(FILLER + "Applicants must already reside in Japan. " + FILLER,
+                       country="japan", location="Tokyo")
+
+        self.assertEqual(job.local_hire, "in_country_only")
+        self.assertIn("LOCAL_CANDIDATES_ONLY", job.eligibility_blockers)
+
+    def test_malta_single_permit_support(self):
+        job = evaluate(FILLER + "We will support your Single Permit application. " + FILLER,
+                       country="malta", location="Sliema")
+
+        self.assertEqual(job.visa_sponsorship_status, "yes")
+
+
+class TestCzechiaAndPriorities(unittest.TestCase):
+
+    def test_czech_cities(self):
+        configs = search_configs(["czechia", "romania"])
+        for location, key in (("Praha, Czechia", "czechia"), ("Brno, South Moravia, Czech Republic", "czechia"),
+                              ("Cluj-Napoca, Romania", "romania")):
+            self.assertEqual(country_of_location(location, configs), key, location)
+
+    def test_czech_required(self):
+        job = evaluate(FILLER + "Fluent Czech is required for this role. " + FILLER,
+                       country="czechia", location="Praha")
+        self.assertIn("CZECH_REQUIRED", job.eligibility_blockers)
+
+    def test_czech_republic_is_not_the_language(self):
+        job = evaluate(FILLER + "Our office is in the Czech Republic and we need strong skills. " + FILLER,
+                       country="czechia", location="Praha")
+        self.assertNotIn("Czech", job.other_languages or {})
+
+    def test_gulf_preference_is_only_within_the_gulf(self):
+        import config
+
+        # Saudi Arabia and Qatar are normal (like Europe); only the UAE is lower.
+        self.assertEqual(config.COUNTRY_PRIORITY.get("saudi_arabia", 1), 1)
+        self.assertEqual(config.COUNTRY_PRIORITY.get("qatar", 1), 1)
+        self.assertLess(config.COUNTRY_PRIORITY["uae"], 1)
+        self.assertNotIn("romania", config.COUNTRIES)
+
+
 class TestConfig(unittest.TestCase):
 
     def test_new_countries_are_searched(self):
         import config
 
-        for key in ("canada", "austria", "switzerland", "kuwait", "oman"):
+        for key in ("canada", "austria", "switzerland", "kuwait", "oman",
+                    "malta", "poland", "estonia", "lithuania", "sweden", "japan", "czechia"):
             self.assertIn(key, config.COUNTRIES)
             self.assertTrue(COUNTRY_PROFILES[key]["indeed_country"])
 

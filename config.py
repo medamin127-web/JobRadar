@@ -11,17 +11,25 @@ Edit this file to change searches. Nothing here runs anything.
 from countries import search_configs
 
 # Countries to search, from the profiles in countries.py. Ready there:
-#   germany, netherlands, ireland, uk, austria, switzerland, canada,
+#   germany, netherlands, ireland, uk, austria, switzerland, malta,
+#   poland, czechia, romania, estonia, lithuania, sweden, canada, japan,
 #   uae, saudi_arabia, qatar, kuwait, oman, bahrain
 COUNTRIES = [
     "saudi_arabia", "qatar", "germany", "netherlands", "ireland", "uk", "uae",
     "austria", "switzerland", "canada", "kuwait", "oman",
+    "malta", "poland", "estonia", "lithuania", "sweden", "japan",
+    "czechia",
 ]
 
-# Countries you prefer. Priority 2 = searched about twice as often as the
-# others, and their jobs rank a little higher (+5 points) inside the same
-# bucket. Countries not listed have priority 1.
-COUNTRY_PRIORITY = {"saudi_arabia": 2, "qatar": 2}
+# How much you want each country, compared with the others. 1 = normal
+# (every country not listed). Above 1 = searched more often and ranked a
+# little higher (+5 points per step inside the same bucket); below 1 =
+# searched less often and ranked a little lower.
+#
+# Among the Gulf countries you prefer Saudi Arabia and Qatar to the UAE,
+# so the UAE is a bit below normal. This is NOT a preference for the Gulf
+# over Europe: Saudi Arabia and Qatar are normal, like Germany or the UK.
+COUNTRY_PRIORITY = {"uae": 0.75}
 
 # LinkedIn refuses requests (HTTP 429) when one run makes too many
 # searches. So each run searches only this many countries: the ones most
