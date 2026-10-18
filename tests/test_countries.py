@@ -20,7 +20,7 @@ class TestProfiles(unittest.TestCase):
                           "visa_norm", "location_keywords", "search_terms"):
                 self.assertIn(field, profile, f"{key} has no {field}")
 
-            self.assertIn(profile["visa_norm"], ("explicit", "employer_sponsored"))
+            self.assertIn(profile["visa_norm"], ("explicit", "employer_sponsored", "remote"))
             self.assertTrue(profile["search_terms"])
 
     def test_bayt_only_in_the_gulf(self):

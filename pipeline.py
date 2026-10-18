@@ -28,7 +28,7 @@ from services.match_scorer import MatchScorer
 from services.seniority_matcher import SeniorityMatcher
 from services.target_classifier import TargetClassifier
 from countries import country_of_location
-from sources.relevance import in_target_countries, is_tech_title
+from sources.relevance import REMOTE_SITES, in_target_countries, is_generic_remote, is_tech_title
 
 
 CONFIDENCE_RANK = {
@@ -139,8 +139,11 @@ def collect_jobs(
     refused = []
     refused_in_a_row = 0
 
-    def run(search_term, location, country=None):
+    def run(search_term, location, country=None, remote=False):
         extra = {"country": country} if country else {}
+
+        if remote:
+            extra["remote"] = True
 
         return source.search(
             search_term=search_term,
@@ -175,7 +178,8 @@ def collect_jobs(
             print(f"\nSearching{' ' + site if site else ''}: {search_term} | {location}")
 
             country = config.get("indeed_country")
-            scraped = run(search_term, location, country)
+            remote = bool(config.get("remote_search"))
+            scraped = run(search_term, location, country, remote)
 
             if was_refused():
                 print(
@@ -183,7 +187,7 @@ def collect_jobs(
                     f"Waiting {rate_limit_wait}s and retrying once..."
                 )
                 sleep(rate_limit_wait)
-                scraped = run(search_term, location, country)
+                scraped = run(search_term, location, country, remote)
 
             if was_refused():
                 refused.append(f"{search_term} | {location}")
@@ -255,9 +259,33 @@ def assign_countries(jobs: pd.DataFrame, configs) -> pd.DataFrame:
         else pd.Series([None] * len(jobs), index=jobs.index)
     )
 
+    sites = jobs["site"] if "site" in jobs.columns else pd.Series([""] * len(jobs), index=jobs.index)
+    remote = (
+        jobs["is_remote"].map(lambda v: str(v).strip().lower() in ("true", "1"))
+        if "is_remote" in jobs.columns
+        else pd.Series([False] * len(jobs), index=jobs.index)
+    )
+    remote_on = any(config.get("key") == "remote" for config in configs)
+
+    def country(key, location, site, is_remote):
+        if isinstance(key, str) and key:
+            return key
+
+        # Remote boards, and remote feed jobs with no country of their own
+        # ("Remote", "Anywhere"), are remote jobs.
+        if remote_on and site in REMOTE_SITES:
+            return "remote"
+
+        found = country_of_location(location, configs)
+
+        if found is None and remote_on and is_remote and is_generic_remote(location):
+            return "remote"
+
+        return found
+
     countries = [
-        key if isinstance(key, str) and key else country_of_location(location, configs)
-        for key, location in zip(searched, locations)
+        country(key, location, site, is_remote)
+        for key, location, site, is_remote in zip(searched, locations, sites, remote)
     ]
 
     return jobs.assign(country=countries)

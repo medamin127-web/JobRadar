@@ -1183,6 +1183,110 @@ def analyze_local_hire(text: str, title: str = "") -> dict:
 # PUBLIC ENTRY POINT
 # ==================================================
 
+# ==================================================
+# REMOTE FROM TUNISIA (the "remote" country)
+# ==================================================
+
+# Regions that include Tunisia. Tunisia is on UTC+1 all year, the same
+# time as Central Europe in winter, so CET-hours jobs fit too.
+REMOTE_OPEN_PLACES = re.compile(
+    r"anywhere|worldwide|world\b|\bglobal\w*|international|\bemea\b|africa|\bmena\b"
+    r"|middle east|tunisia|any (?:country|location|where)|no (?:location )?restrictions?",
+    re.IGNORECASE,
+)
+
+REMOTE_TIMEZONE_FITS = re.compile(
+    r"\bcet\b|\bcest\b|(?:utc|gmt)\s*\+\s*0?1\b|european (?:time ?zones?|hours|business hours)"
+    # "CET +/- 2 hours", "UTC ±2": but not "UTC-5" (the Americas).
+    r"|(?:cet|utc|gmt)\s*(?:±|\+/-|\+-)\s*[1-3]\b|(?:utc|gmt)\s*\+\s*[0-2]\b",
+    re.IGNORECASE,
+)
+
+REMOTE_EUROPE = re.compile(r"\beurope\w*|\beu\b|\beea\b|european union", re.IGNORECASE)
+
+# Words in a region text that are not places.
+_REGION_FILLER = re.compile(
+    r"\b(?:remote|remotely|only|based|in|or|and|the|from|job|jobs|position|work|working"
+    r"|time ?zones?|timezone|hours|full[- ]time|part[- ]time|contract|hybrid|office"
+    r"|location|locations|countries|country|regions?|preferred|friendly|first|onsite|on-site)\b"
+    r"|[^a-zà-ÿ]+",
+    re.IGNORECASE,
+)
+
+# The text says the employer hires only in other countries.
+_ELSEWHERE = (
+    r"(?:the\s+)?(?:us|u\.s\.|usa|united states|north america|canada|uk|united kingdom"
+    r"|latin america|latam|apac|australia|india|brazil)\b"
+)
+
+REMOTE_ELSEWHERE_ONLY = re.compile(
+    # "US-based only", "UK residents" (not "a US-based company")
+    r"\b(?:us|u\.s\.|usa|united states|north america|canada|uk|united kingdom|latam|latin america"
+    r"|apac|australia|india|brazil)[- ](?:only|residents?|based (?:candidates?|applicants?|only))\b"
+    # about the candidate: "you must be based in the US", "candidates located in Canada"
+    r"|(?:you|candidates?|applicants?|must|should|need to|needs to|open to|hiring)\s+(?:\w+\s+){0,4}"
+    r"(?:based|located|resid\w*|living|live)\s+(?:with)?in\s+(?:\w+\s+){0,2}" + _ELSEWHERE +
+    r"|(?:authori[sz]ed|eligible|legally allowed|right) to work in " + _ELSEWHERE,
+    re.IGNORECASE,
+)
+
+
+# Ways employers pay people abroad: a good sign for Tunisia.
+REMOTE_HIRES_ABROAD = re.compile(
+    r"\bdeel\b|\boyster\b|employer of record|\beor\b|remote\.com"
+    r"|hire (?:contractors|people|talent|engineers)\s+(?:from\s+)?(?:anywhere|worldwide|globally|around the world)"
+    r"|contractors? (?:from|in) (?:any|all) countr",
+    re.IGNORECASE,
+)
+
+
+def analyze_remote_open(location, text, remote_scope=None, source_hint=None) -> dict:
+    """
+    Can someone living in Tunisia take this remote job?
+
+        yes      worldwide / EMEA / Africa / CET hours, or the board says so
+        europe   "Europe" / "EU" only: usually needs EU residence
+        no       the job names other places only ("USA only", "UK, Ireland")
+        unknown  nothing clear
+    """
+
+    region = str(location or "")
+
+    def verdict(value, evidence):
+        return {"remote_open": value, "remote_open_evidence": snippet(evidence) if evidence else None}
+
+    if source_hint == "open_to_you":
+        return verdict("yes", f"The board lists it as open to people in Tunisia ({region}).")
+
+    if REMOTE_OPEN_PLACES.search(region) or REMOTE_TIMEZONE_FITS.search(region):
+        return verdict("yes", f"Region: {region}")
+
+    if REMOTE_EUROPE.search(region):
+        return verdict("europe", f"Region: {region}")
+
+    if _REGION_FILLER.sub(" ", region).strip():
+        # Names places, none of them yours: "USA Only", "Canada, UK".
+        return verdict("no", f"Region: {region}")
+
+    # No region from the board: read the ad.
+    for sentence in split_sentences(text or ""):
+        if REMOTE_ELSEWHERE_ONLY.search(sentence):
+            return verdict("no", sentence)
+
+    for sentence in split_sentences(text or ""):
+        if REMOTE_HIRES_ABROAD.search(sentence) or REMOTE_TIMEZONE_FITS.search(sentence):
+            return verdict("yes", sentence)
+
+    if remote_scope in ("worldwide", "emea"):
+        return verdict("yes", f"The ad describes the remote scope as {remote_scope}.")
+    if remote_scope == "eu_only":
+        return verdict("europe", "The ad limits remote work to the EU.")
+    if remote_scope in ("germany_only", "country_only"):
+        return verdict("no", "The ad limits remote work to one country.")
+
+    return verdict("unknown", None)
+
+
 class EligibilityAnalyzer:
     """
     Fills the eligibility signal fields on a Job.
@@ -1210,6 +1314,8 @@ class EligibilityAnalyzer:
                 "relocation_evidence": "No job description available.",
                 "work_mode": "unclear",
                 "remote_scope": "unknown",
+                **(analyze_remote_open(job.location, "", None, job.source_hint)
+                   if job.country == "remote" else {}),
                 "international_friendly": False,
                 "has_description": False,
                 "salary_hint_max_eur": extract_salary_hint(job),
@@ -1220,6 +1326,11 @@ class EligibilityAnalyzer:
         visa = analyze_visa(text)
         relocation = analyze_relocation(text)
         remote = analyze_remote(job, text)
+
+        if job.country == "remote":
+            remote.update(analyze_remote_open(
+                job.location, text, remote["remote_scope"], job.source_hint,
+            ))
 
         # A company that refuses relocation will not bring someone over
         # from outside the EU either (your label on Wolt's ad).
@@ -1272,6 +1383,8 @@ class EligibilityAnalyzer:
 
         job.work_mode = signals["work_mode"]
         job.remote_scope = signals["remote_scope"]
+        job.remote_open = signals.get("remote_open")
+        job.remote_open_evidence = signals.get("remote_open_evidence")
         job.international_friendly = signals["international_friendly"]
         job.has_description = signals["has_description"]
         job.salary_hint_max_eur = signals["salary_hint_max_eur"]

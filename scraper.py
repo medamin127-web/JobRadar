@@ -35,7 +35,10 @@ from config import (
     JAABZ_PAGES,
     DB_PATH,
     GREENHOUSE_BOARDS,
+    HIMALAYAS_TERMS,
     LEVER_COMPANIES,
+    REMOTE_BOARDS,
+    YOUR_COUNTRY,
     DELAY_BETWEEN_SEARCHES,
     HOURS_OLD,
     MAX_JOB_AGE_DAYS,
@@ -149,6 +152,12 @@ def build_feeds(known_ids=(), searched=None):
 
     feeds += [GreenhouseSource(board) for board in GREENHOUSE_BOARDS]
     feeds += [LeverSource(company) for company in LEVER_COMPANIES]
+
+    # Remote boards: every run, when "remote" is one of your countries.
+    if REMOTE_BOARDS and any(config["key"] == "remote" for config in SEARCH_CONFIGS):
+        from sources import remote_board_sources
+
+        feeds += remote_board_sources(REMOTE_BOARDS, HIMALAYAS_TERMS, YOUR_COUNTRY)
 
     return feeds
 

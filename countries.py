@@ -21,10 +21,13 @@ Fields:
     skip_locations     places in that country you do not want (French-speaking
                        Québec and Romandy): jobs there are skipped, with the
                        reason in skip_reason
+    remote_search      search with LinkedIn's "remote" filter (the "remote" profile)
     visa_norm          "explicit": silence about visas means probably no
                        (Germany, most of Europe)
                        "employer_sponsored": the employer normally arranges
                        the work visa (Gulf); silence is a cautious maybe
+                       "remote": no visa; the question is whether the
+                       employer hires people living in Tunisia
     search_terms       one search per term and site
 """
 
@@ -379,6 +382,28 @@ COUNTRY_PROFILES = {
             "Full Stack Engineer",
             "Software Engineer visa sponsorship",
             "Software Developer LMIA",
+        ],
+    },
+
+    # ------------------------------------------------------------ Remote
+
+    # Not a country: jobs you would do from home in Tunisia. Found by a
+    # LinkedIn search of remote jobs in EMEA and by the remote job boards
+    # (REMOTE_BOARDS in config.py). No visa needed, but the employer must
+    # hire people in Tunisia: eligibility_analyzer.py reads the job's
+    # region ("Anywhere", "EMEA" yes; "USA only", "UK only" no).
+    "remote": {
+        "name": "Remote (from Tunisia)",
+        "location": "EMEA",
+        "remote_search": True,           # LinkedIn's "remote" filter
+        "indeed_country": None,
+        "sites": ["linkedin"],
+        "local_language": "English",
+        "visa_norm": "remote",
+        "location_keywords": [],
+        "search_terms": BASE_TERMS + [
+            "React Developer",
+            "Frontend Developer",
         ],
     },
 

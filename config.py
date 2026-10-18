@@ -13,13 +13,19 @@ from countries import search_configs
 # Countries to search, from the profiles in countries.py. Ready there:
 #   germany, netherlands, ireland, uk, austria, switzerland, malta,
 #   poland, czechia, romania, estonia, lithuania, sweden, canada, japan,
+#   remote (jobs done from home in Tunisia),
 #   uae, saudi_arabia, qatar, kuwait, oman, bahrain
 COUNTRIES = [
     "saudi_arabia", "qatar", "germany", "netherlands", "ireland", "uk", "uae",
     "austria", "switzerland", "canada", "kuwait", "oman",
     "malta", "poland", "estonia", "lithuania", "sweden", "japan",
     "czechia",
+    # Not a country: remote jobs you can do from Tunisia (see REMOTE_BOARDS).
+    "remote",
 ]
+
+# Where you live: remote jobs must be open to people in this country.
+YOUR_COUNTRY = "Tunisia"
 
 # How much you want each country, compared with the others. 1 = normal
 # (every country not listed). Above 1 = searched more often and ranked a
@@ -80,6 +86,15 @@ RELOCATEME_PAGES = 5
 # Off: StepStone blocks visitors from Tunisia, even in a normal browser
 # ("Access Denied", Oct 2026). Set to 1 to try again from elsewhere.
 STEPSTONE_PAGES = 0
+
+# Remote-only job boards (free public feeds), read every run when
+# "remote" is in COUNTRIES. [] = off. Check them first with:
+#   python sources_check.py remote
+REMOTE_BOARDS = ["remotive", "remoteok", "weworkremotely", "workingnomads", "himalayas"]
+
+# Himalayas is searched (one request per term) for jobs open to people in
+# YOUR_COUNTRY; the other boards just give their newest jobs.
+HIMALAYAS_TERMS = ["full stack", "frontend", "react", "backend", "software engineer", "web developer"]
 
 RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72

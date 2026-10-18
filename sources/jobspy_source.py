@@ -67,6 +67,7 @@ class JobSpySource(JobSource):
         results_wanted: int,
         hours_old: int,
         country: str = None,
+        remote: bool = False,
     ) -> pd.DataFrame:
 
         watcher = _RateLimitWatcher()
@@ -80,6 +81,10 @@ class JobSpySource(JobSource):
         if country:
             # Indeed and Glassdoor need the country name ("germany").
             extra["country_indeed"] = country
+
+        if remote:
+            # LinkedIn's "remote" filter (the "remote" country profile).
+            extra["is_remote"] = True
 
         try:
             jobs = scrape_jobs(

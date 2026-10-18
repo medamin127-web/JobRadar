@@ -140,6 +140,10 @@ class Job:
 
     work_mode: Optional[str] = None  # remote | hybrid | unclear
     remote_scope: Optional[str] = None
+    # Remote jobs (country "remote"): can you do it from Tunisia?
+    # yes | europe | no | unknown
+    remote_open: Optional[str] = None
+    remote_open_evidence: Optional[str] = None
     international_friendly: Optional[bool] = None
     has_description: Optional[bool] = None
     salary_hint_max_eur: Optional[float] = None

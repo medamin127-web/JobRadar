@@ -25,12 +25,18 @@ NOT_TECH = re.compile(
     r"|recipe|value engineer|pre-?sales|customer success"
     r"|planning engineer|site engineer|commissioning|draftsman|draughtsman"
     r"|interior|landscap|timekeeper|\bhvac\b|\bmep\b|surveyor|estimator"
-    r"|technician|\bit support\b|helpdesk|help desk|volunteer|vrijwillig",
+    r"|technician|\bit support\b|helpdesk|help desk|volunteer|vrijwillig"
+    r"|structural|architectural engineer|steel|fabrication|construction engineer|piping|instrumentation engineer"
+    r"|geotechnical|chemical engineer|petroleum|drilling|marine engineer",
     re.IGNORECASE,
 )
 
 # Sources that return jobs from everywhere (not a search in one country).
 FEED_SITES = {"arbeitnow", "greenhouse", "lever", "jaabz", "relocateme"}
+
+# Remote-only job boards (remote_boards.py): their jobs belong to "remote".
+REMOTE_SITES = {"remotive", "remoteok", "weworkremotely", "workingnomads", "himalayas"}
+FEED_SITES |= REMOTE_SITES
 
 # A remote feed job is kept only when its location is just "remote" (or a
 # region that includes your countries), not "Remote, Netherlands" or
@@ -40,6 +46,13 @@ GENERIC_REMOTE = re.compile(
     r"|europe|eu|emea|remote\W+(?:europe|eu|emea|worldwide|anywhere))\W*$",
     re.IGNORECASE,
 )
+
+
+def is_generic_remote(location) -> bool:
+    """"Remote", "Anywhere", "EMEA", or no location at all."""
+
+    text = str(location or "").strip()
+    return not text or bool(GENERIC_REMOTE.match(text))
 
 
 # Not a paid job at all, whatever the role: skipped even when the title
@@ -145,8 +158,10 @@ def in_target_countries(frame, configs):
 
     from_feed = sites.isin(FEED_SITES)
     located = locations.map(lambda loc: in_country(loc, keywords))
-    generic_remote = remote & locations.map(
-        lambda loc: not str(loc or "").strip() or bool(GENERIC_REMOTE.match(str(loc)))
-    )
+    generic_remote = remote & locations.map(is_generic_remote)
 
-    return (~from_feed & searched) | located | generic_remote
+    # Remote boards count when you search "remote": whether a job is open
+    # to Tunisia is decided later (eligibility), not here.
+    remote_board = sites.isin(REMOTE_SITES) & ("remote" in keys)
+
+    return (~from_feed & searched) | located | generic_remote | remote_board

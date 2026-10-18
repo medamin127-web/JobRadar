@@ -8,6 +8,8 @@ Check job sources from your computer before adding them to config.py.
     python sources_check.py jaabz              read Jaabz (visa jobs) for your countries
     python sources_check.py relocateme         read Relocate.me (relocation jobs)
     python sources_check.py stepstone          read StepStone (Germany), one search
+    python sources_check.py remote             read the remote boards (REMOTE_BOARDS)
+    python sources_check.py remote himalayas   ... only these boards
     python sources_check.py jaabz dump         ... and save its HTML in data/samples
                                                (same for: relocateme dump)
 
@@ -22,7 +24,15 @@ jobs.lever.co/<name>/... -> Lever name.
 
 import sys
 
-from config import ARBEITNOW_PAGES, GREENHOUSE_BOARDS, LEVER_COMPANIES, SEARCH_CONFIGS
+from config import (
+    ARBEITNOW_PAGES,
+    GREENHOUSE_BOARDS,
+    HIMALAYAS_TERMS,
+    LEVER_COMPANIES,
+    REMOTE_BOARDS,
+    SEARCH_CONFIGS,
+    YOUR_COUNTRY,
+)
 from sources import (
     StepStoneSource,
     ArbeitnowSource,
@@ -189,6 +199,43 @@ def check_stepstone(output=print, dump=False, source=None):
     return result
 
 
+def check_remote(names=None, output=print, sources=None):
+    """Read each remote board; say what worked and what JobRadar would do."""
+
+    from sources import remote_board_sources
+
+    sources = sources or remote_board_sources(names or REMOTE_BOARDS, HIMALAYAS_TERMS, YOUR_COUNTRY)
+    working = []
+
+    for source in sources:
+        output(f"\n{source.name}:")
+
+        try:
+            jobs = source.fetch()
+        except Exception as error:
+            output(f"  unreachable ({error})")
+            continue
+
+        stats = source.stats
+        output(f"  {stats.get('listed', 0)} jobs read, {stats.get('tech', 0)} with a tech title")
+
+        if jobs.empty:
+            output("  works, but nothing to show right now")
+            working.append(source.name)
+            continue
+
+        working.append(source.name)
+        tech = jobs[jobs["title"].map(is_tech_title)]
+
+        if not tech.empty:
+            print_verdicts(tech, output)
+
+    if working:
+        output(f"\nWorking boards. In config.py:  REMOTE_BOARDS = {working!r}")
+
+    return working
+
+
 def save_samples(name, source, output=print):
     """Save a list page and one job page, to fix the parser if the site changes."""
 
@@ -262,6 +309,9 @@ def main(argv=None, output=print):
         return
     elif argv[0] == "relocateme":
         check_relocateme(output, dump="dump" in argv[1:])
+        return
+    elif argv[0] == "remote":
+        check_remote(argv[1:] or None, output)
         return
     elif argv[0] in ("greenhouse", "lever") and len(argv) > 1:
         run(argv[0], argv[1:])

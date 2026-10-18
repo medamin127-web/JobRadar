@@ -255,6 +255,13 @@ def print_details(job_objects) -> None:
                 else "not found (check: the company may be registered under a different legal name)"
             )
             print(f"  {job.sponsor_register_title}: {found}")
+
+        if job.remote_open:
+            label = {
+                "yes": "yes", "no": "no", "europe": "Europe only (usually needs EU residence)",
+                "unknown": "unclear (read the ad)",
+            }.get(job.remote_open, job.remote_open)
+            print(f"  Remote from Tunisia: {label} | {job.remote_open_evidence or ''}")
         print(f"  Job language: {job.job_language} | Work mode: {job.work_mode} | Remote scope: {job.remote_scope}")
 
 

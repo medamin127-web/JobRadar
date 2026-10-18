@@ -59,7 +59,13 @@ class EligibilityEvaluator:
 
         # ---------------- Visa / work authorization ----------------
 
-        if visa == "no":
+        # A remote job done from Tunisia needs no visa: what matters is
+        # whether the employer hires people there (below).
+        remote_job = job.country == "remote"
+
+        if visa == "no" and remote_job:
+            warnings.append("SAYS_NO_VISA_SPONSORSHIP")
+        elif visa == "no":
             blockers.append("NO_VISA_SPONSORSHIP")
 
         if visa == "mixed":
@@ -139,7 +145,21 @@ class EligibilityEvaluator:
             and job.remote_scope == "worldwide"
         )
 
-        if job.work_mode == "remote":
+        open_to_you = remote_job and job.remote_open == "yes"
+
+        if remote_job:
+            if job.remote_open == "yes":
+                positives.append("REMOTE_OPEN_TO_TUNISIA")
+            elif job.remote_open == "no":
+                blockers.append("REMOTE_NOT_OPEN_TO_TUNISIA")
+            elif job.remote_open == "europe":
+                # Tunisia shares Central European hours, but "Europe only"
+                # usually means living in the EU.
+                warnings.append("REMOTE_EUROPE_ONLY")
+            else:
+                warnings.append("REMOTE_REGION_UNCLEAR")
+
+        elif job.work_mode == "remote":
             if job.remote_scope == "worldwide":
                 positives.append("REMOTE_WORLDWIDE")
             elif job.remote_scope == "emea":
@@ -236,7 +256,7 @@ class EligibilityEvaluator:
             # makes a job "likely". Relocation help alone is not visa
             # help: a relocation bonus is often meant for people who
             # already live in Germany.
-            strong = sponsored or worldwide_remote
+            strong = sponsored or worldwide_remote or open_to_you
             medium = (
                 on_register
                 or relocation == "yes"
