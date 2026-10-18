@@ -6,7 +6,7 @@ Design rule: eligibility is a GATE, not another weighted score.
 A perfect technical match you cannot legally take is a "skip".
 """
 
-from countries import profile_of
+from countries import profile_of, skipped_location
 from sources.relevance import is_tech_title, is_unpaid_title
 from models import Job, Profile
 
@@ -290,6 +290,10 @@ class ApplicationBucketer:
         if status == "blocked":
             bucket = "skip"
             reason = "Blocked: " + ", ".join(job.eligibility_blockers)
+
+        elif skipped_location(job.location, job.country):
+            bucket = "skip"
+            reason = "Region you do not target: " + skipped_location(job.location, job.country)
 
         elif is_unpaid_title(job.title):
             bucket = "skip"

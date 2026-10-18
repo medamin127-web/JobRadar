@@ -429,7 +429,10 @@ VISA_TOPIC = re.compile(
     r"|staatsangeh\w+|arbeitsberechtigung"
     r"|berechtigung zur beschäftigung|beschäftigungserlaubnis"
     r"|skilled worker|highly skilled migrant|kennismigrant|\bhsm\b|critical skills"
-    r"|employment permit|stamp\s*(?:4|1g)|settled status|indefinite leave",
+    r"|employment permit|stamp\s*(?:4|1g)|settled status|indefinite leave"
+    # Canada, Austria, Switzerland
+    r"|canadian citizen|permanent residen\w+|\blmia\b|red[- ]white[- ]red|rot[- ]weiß[- ]rot"
+    r"|\brwr\b|swiss (?:work )?permit|\b(?:b|c|g) permit|eu/efta",
     re.IGNORECASE,
 )
 
@@ -466,7 +469,8 @@ POSITIVE_VERBS = re.compile(
 
 _PERMITS = (
     r"(?:visa|work permit|blue card|skilled worker|highly skilled migrant|kennismigrant"
-    r"|critical skills|employment permit)"
+    r"|critical skills|employment permit|lmia|red[- ]white[- ]red card|rot[- ]weiß[- ]rot[- ]karte"
+    r"|rwr[- ]karte|rwr card)"
 )
 
 SPONSOR_TERM = re.compile(
@@ -479,7 +483,8 @@ SPONSOR_TERM = re.compile(
 SUPPORT_VISA = re.compile(
     r"(?:support|assist|help|unterstütz\w*|begleit\w*|kümmern\w*)\W+(?:\w+\W+){0,6}"
     r"(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|arbeitsgenehmigung|blue card|blaue karte|einreise"
-    r"|employment permit|critical skills|highly skilled migrant|kennismigrant|skilled worker)"
+    r"|employment permit|critical skills|highly skilled migrant|kennismigrant|skilled worker"
+    r"|lmia|red[- ]white[- ]red card|rot[- ]weiß[- ]rot[- ]karte|rwr[- ]karte)"
     r"|(?:visa|visum|work permit|aufenthalt\w*|arbeitserlaubnis|blue card|blaue karte)\W+(?:\w+\W+){0,4}"
     r"(?:support|assistance|unterstützung|unterstützen|übernehmen|help)",
     re.IGNORECASE,
@@ -513,6 +518,9 @@ _AUTH_WORDS = (
     # UK / Ireland: already holding a status that allows work
     "|stamp\\s*(?:4|1g)|settled status|pre-settled status|indefinite leave to remain"
     "|eu passport|irish citizenship|british citizenship|uk passport"
+    # Canada / Switzerland
+    "|canadian citizen\\w*|permanent residen\\w+|\\bpr status|swiss work permit"
+    "|(?:b|c|g) permit|eu/efta (?:citizenship|passport|nationality)"
 )
 
 _ALLOWED_TO_WORK = (
@@ -527,7 +535,8 @@ WORK_AUTH_REQUIRED = compile_all([
     + _AUTH_WORDS + "|" + _ALLOWED_TO_WORK + ")",
     "(?:" + _AUTH_WORDS + r")\s+(?:\w+\s+){0,5}(?:is |are |ist |sind )?"
     r"(?:required|mandatory|needed|necessary|erforderlich|notwendig|vorausgesetzt|zwingend|nachzuweisen)",
-    r"(?:authori[sz]ed|eligible|legally (?:allowed|permitted|entitled)|allowed|permitted) to work (?:in|within) (?:the )?(?:germany|eu|europe|european union|uk|united kingdom|ireland|netherlands|eea)",
+    r"(?:authori[sz]ed|eligible|legally (?:allowed|permitted|entitled)|allowed|permitted) to work (?:in|within) (?:the )?(?:germany|eu|europe|european union|uk|united kingdom|ireland|netherlands|eea"
+    r"|canada|austria|österreich|switzerland|schweiz|eu/efta)",
     r"\beu[- ]?(?:citizens?|nationals?)\s+(?:\w+\s+){0,3}(?:only|required)"
     r"|\bonly\s+(?:\w+\s+){0,2}eu[- ]?(?:citizens?|nationals?)"
     r"|\bnur\s+(?:\w+\s+){0,2}eu[- ]?b(?:ü|u)rger",
@@ -704,11 +713,13 @@ REMOTE_GERMANY_ONLY = re.compile(
 # Remote, but only from inside one of the countries JobRadar searches.
 REMOTE_COUNTRY_ONLY = re.compile(
     r"(?:remote|home ?office|work from home|wfh)\W+(?:\w+\W+){0,6}(?:within|in|from|inside|only)\W+(?:the\W+)?"
-    r"(?:uk|united kingdom|england|netherlands|nederland|ireland|uae|united arab emirates|saudi arabia|ksa|qatar)\b"
+    r"(?:uk|united kingdom|england|netherlands|nederland|ireland|uae|united arab emirates|saudi arabia|ksa|qatar"
+    r"|canada|austria|österreich|switzerland|schweiz|kuwait|oman)\b"
     r"|(?:based|located|living|residing|resident|residents)\W+(?:\w+\W+){0,4}(?:the\W+)?"
-    r"(?:uk|united kingdom|netherlands|ireland)\b"
-    r"|\bremote\s*[-–(]\s*(?:uk|united kingdom|netherlands|nl|ireland|ie)\b"
-    r"|\b(?:uk|netherlands|ireland)[- ](?:based|remote)\b",
+    r"(?:uk|united kingdom|netherlands|ireland|canada|austria|switzerland)\b"
+    r"|\bremote\s*[-–(]\s*(?:uk|united kingdom|netherlands|nl|ireland|ie|canada|ca|austria|at|switzerland|ch)\b"
+    r"|\b(?:uk|netherlands|ireland|canada|austria|switzerland)[- ](?:based|remote)\b"
+    r"|österreichweit|schweizweit",
     re.IGNORECASE,
 )
 

@@ -70,24 +70,41 @@ def has_keyword(text, keywords) -> bool:
     )
 
 
-# Cities that exist in North America too: "Cambridge, MA", "London, ON",
-# "Birmingham, AL" are not the UK.
-ELSEWHERE = re.compile(
-    r"\b(?:usa|u\.s\.a?|united states|america|canada)\b"
-    # US states / Canadian provinces, except codes that are also countries
-    # or common words (DE, IN, ID, ME, OR, HI...).
+# Cities that exist in the US too: "Cambridge, MA", "Birmingham, AL" are
+# not the UK.
+IN_THE_US = re.compile(
+    r"\b(?:usa|u\.s\.a?|united states|america)\b"
+    # US states, except codes that are also countries or common words
+    # (DE, IN, ID, ME, OR, HI...).
     r"|,\s*(?:al|ak|az|ar|ca|co|ct|fl|ga|il|ia|ks|ky|md|ma|mi|mn|ms"
-    r"|mo|mt|nv|nh|nj|nm|ny|nc|nd|oh|ok|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy"
-    r"|on|qc|bc|mb|ns|nb)\b(?:\s*,|\s*$)",
+    r"|mo|mt|nv|nh|nj|nm|ny|nc|nd|oh|ok|pa|ri|sc|sd|tn|tx|ut|vt|va|wa|wv|wi|wy)\b(?:\s*,|\s*$)",
+    re.IGNORECASE,
+)
+
+# Canada, or a Canadian province code: "London, ON" is Canada, not the UK.
+# (Not NL for Newfoundland: "Amsterdam, NL" is the Netherlands.)
+IN_CANADA = re.compile(
+    r"\bcanada\b|,\s*(?:on|qc|bc|ab|mb|sk|ns|nb|pe)\b(?:\s*,|\s*$)"
+    r"|\b(?:ontario|quebec|québec|british columbia|alberta|manitoba|saskatchewan|nova scotia)\b",
     re.IGNORECASE,
 )
 
 
 def in_country(location, keywords) -> bool:
-    """True when the location names the country or one of its cities."""
+    """
+    True when the location names the country or one of its cities.
 
-    if ELSEWHERE.search(str(location or "")):
+    A Canadian location only counts for Canada ("London, ON" is not
+    London, UK); a US location never counts.
+    """
+
+    location = str(location or "")
+
+    if IN_THE_US.search(location):
         return False
+
+    if IN_CANADA.search(location):
+        return "canada" in {str(k).lower() for k in keywords}
 
     return has_keyword(location, keywords)
 

@@ -18,6 +18,9 @@ Fields:
                        to this country when its location contains one
     local_language     the language employers may ask for
     jaabz              the country's name in Jaabz addresses (?countries=...)
+    skip_locations     places in that country you do not want (French-speaking
+                       Québec and Romandy): jobs there are skipped, with the
+                       reason in skip_reason
     visa_norm          "explicit": silence about visas means probably no
                        (Germany, most of Europe)
                        "employer_sponsored": the employer normally arranges
@@ -141,6 +144,89 @@ COUNTRY_PROFILES = {
         ],
     },
 
+    "austria": {
+        "name": "Austria",
+        "jaabz": "austria",
+        "location": "Austria",
+        "indeed_country": "austria",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "German",
+        "visa_norm": "explicit",
+        # Software developers are on Austria's nationwide shortage list
+        # (Red-White-Red Card for skilled workers in shortage occupations).
+        "location_keywords": [
+            "austria", "österreich", "osterreich", "vienna", "wien", "graz",
+            "linz", "salzburg", "innsbruck", "klagenfurt", "villach", "wels",
+            "st. pölten", "sankt pölten", "dornbirn", "hagenberg", "leonding",
+        ],
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer Red-White-Red Card",
+            "Software Engineer relocation",
+        ],
+    },
+
+    "switzerland": {
+        "name": "Switzerland",
+        "jaabz": "switzerland",
+        "location": "Switzerland",
+        "indeed_country": "switzerland",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "German",
+        "visa_norm": "explicit",
+        # Non-EU hires need a cantonal quota permit and proof that no Swiss
+        # or EU candidate was found: rare for juniors, so be sceptical.
+        "location_keywords": [
+            "switzerland", "schweiz", "suisse", "svizzera", "zurich", "zürich",
+            "basel", "bern", "berne", "zug", "lucerne", "luzern", "winterthur",
+            "st. gallen", "st gallen", "baar", "aarau", "schaffhausen", "chur",
+            "geneva", "genève", "geneve", "lausanne", "lugano",
+        ],
+        # French- and Italian-speaking regions.
+        "skip_locations": [
+            "geneva", "genève", "geneve", "lausanne", "neuchâtel", "neuchatel",
+            "fribourg", "sion", "yverdon", "montreux", "nyon", "vevey",
+            "lugano", "bellinzona", "locarno", "romandie", "ticino",
+        ],
+        "skip_reason": "French/Italian-speaking part of Switzerland.",
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer visa sponsorship",
+        ],
+    },
+
+    # ------------------------------------------------------------ North America
+
+    "canada": {
+        "name": "Canada",
+        "jaabz": "canada",
+        "location": "Canada",
+        "indeed_country": "canada",
+        "sites": ["linkedin", "indeed"],
+        "local_language": "French",
+        "visa_norm": "explicit",
+        # Employers rarely sponsor juniors from abroad (LMIA work permit);
+        # trust only ads that say they sponsor.
+        "location_keywords": [
+            "canada", "toronto", "vancouver", "ottawa", "calgary", "edmonton",
+            "waterloo", "kitchener", "mississauga", "markham", "burnaby",
+            "winnipeg", "halifax", "victoria", "hamilton", "london, on",
+            "regina", "saskatoon", "surrey", "richmond hill", "oakville",
+            "montreal", "montréal", "quebec city", "laval", "gatineau",
+        ],
+        # French-speaking Québec.
+        "skip_locations": [
+            "montreal", "montréal", "quebec", "québec", "laval", "gatineau",
+            "sherbrooke", "longueuil", "trois-rivières", ", qc",
+        ],
+        "skip_reason": "Québec (French-speaking).",
+        "search_terms": BASE_TERMS + [
+            "Full Stack Engineer",
+            "Software Engineer visa sponsorship",
+            "Software Developer LMIA",
+        ],
+    },
+
     # ------------------------------------------------------------ Gulf
 
     "uae": {
@@ -187,18 +273,18 @@ COUNTRY_PROFILES = {
         "search_terms": GULF_TERMS,
     },
 
-    # Smaller markets: ready, but not in COUNTRIES by default.
+    # Smaller Gulf markets.
 
     "kuwait": {
         "name": "Kuwait",
         "jaabz": "kuwait",
         "location": "Kuwait",
         "indeed_country": "kuwait",
-        "sites": ["linkedin", "bayt"],
+        "sites": ["linkedin", "indeed", "bayt"],
         "local_language": "Arabic",
         "visa_norm": "employer_sponsored",
-        "location_keywords": ["kuwait"],
-        "search_terms": BASE_TERMS,
+        "location_keywords": ["kuwait", "kuwait city", "hawalli", "salmiya", "farwaniya", "ahmadi"],
+        "search_terms": GULF_TERMS,
     },
 
     "oman": {
@@ -206,11 +292,11 @@ COUNTRY_PROFILES = {
         "jaabz": "oman",
         "location": "Oman",
         "indeed_country": "oman",
-        "sites": ["linkedin", "bayt"],
+        "sites": ["linkedin", "indeed", "bayt"],
         "local_language": "Arabic",
         "visa_norm": "employer_sponsored",
-        "location_keywords": ["oman", "muscat", "sohar", "salalah"],
-        "search_terms": BASE_TERMS,
+        "location_keywords": ["oman", "muscat", "sohar", "salalah", "nizwa", "duqm", "seeb"],
+        "search_terms": GULF_TERMS,
     },
 
     "bahrain": {
@@ -258,6 +344,28 @@ def country_of_location(location, configs):
     for config in configs:
         if in_country(location, config.get("location_keywords", [])):
             return config["key"]
+
+    return None
+
+
+def skipped_location(location, key):
+    """The skip reason when the location is in a region you do not want."""
+
+    import re
+
+    from sources.relevance import has_keyword
+
+    profile = profile_of(key) or {}
+    places = profile.get("skip_locations") or []
+    text = str(location or "")
+
+    # ", qc": a region code after a comma ("Laval, QC, Canada").
+    codes = [p.lstrip(", ") for p in places if p.startswith(",")]
+    names = [p for p in places if not p.startswith(",")]
+
+    if any(re.search(r",\s*" + re.escape(code) + r"\b", text, re.IGNORECASE) for code in codes) \
+            or has_keyword(text, names):
+        return profile.get("skip_reason")
 
     return None
 

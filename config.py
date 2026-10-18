@@ -11,9 +11,12 @@ Edit this file to change searches. Nothing here runs anything.
 from countries import search_configs
 
 # Countries to search, from the profiles in countries.py. Ready there:
-#   germany, netherlands, ireland, uk, uae, saudi_arabia, qatar,
-#   kuwait, oman, bahrain
-COUNTRIES = ["saudi_arabia", "qatar", "germany", "netherlands", "ireland", "uk", "uae"]
+#   germany, netherlands, ireland, uk, austria, switzerland, canada,
+#   uae, saudi_arabia, qatar, kuwait, oman, bahrain
+COUNTRIES = [
+    "saudi_arabia", "qatar", "germany", "netherlands", "ireland", "uk", "uae",
+    "austria", "switzerland", "canada", "kuwait", "oman",
+]
 
 # Countries you prefer. Priority 2 = searched about twice as often as the
 # others, and their jobs rank a little higher (+5 points) inside the same
