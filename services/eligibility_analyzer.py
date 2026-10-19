@@ -1190,7 +1190,8 @@ def analyze_local_hire(text: str, title: str = "") -> dict:
 # Regions that include Tunisia. Tunisia is on UTC+1 all year, the same
 # time as Central Europe in winter, so CET-hours jobs fit too.
 REMOTE_OPEN_PLACES = re.compile(
-    r"anywhere|worldwide|world\b|\bglobal\w*|international|\bemea\b|africa|\bmena\b"
+    # (South Africa alone is not Africa.)
+    r"anywhere|worldwide|world\b|\bglobal\w*|international|\bemea\b|(?<!south )africa|\bmena\b"
     r"|middle east|tunisia|any (?:country|location|where)|no (?:location )?restrictions?",
     re.IGNORECASE,
 )
@@ -1206,7 +1207,8 @@ REMOTE_EUROPE = re.compile(r"\beurope\w*|\beu\b|\beea\b|european union", re.IGNO
 
 # Words in a region text that are not places.
 _REGION_FILLER = re.compile(
-    r"\b(?:remote|remotely|only|based|in|or|and|the|from|job|jobs|position|work|working"
+    r"\b(?:remote|remotely|remoto|remota|remot|télétravail|teletrabajo|distance|à|homeoffice|home"
+    r"|only|based|in|or|and|the|from|job|jobs|position|work|working"
     r"|time ?zones?|timezone|hours|full[- ]time|part[- ]time|contract|hybrid|office"
     r"|location|locations|countries|country|regions?|preferred|friendly|first|onsite|on-site)\b"
     r"|[^a-zà-ÿ]+",
@@ -1240,6 +1242,11 @@ REMOTE_HIRES_ABROAD = re.compile(
 )
 
 
+def short_region(region, limit=80) -> str:
+    region = str(region or "")
+    return region if len(region) <= limit else region[:limit].rsplit(",", 1)[0] + ", ..."
+
+
 def analyze_remote_open(location, text, remote_scope=None, source_hint=None) -> dict:
     """
     Can someone living in Tunisia take this remote job?
@@ -1258,15 +1265,26 @@ def analyze_remote_open(location, text, remote_scope=None, source_hint=None) -> 
     if source_hint == "open_to_you":
         return verdict("yes", f"The board lists it as open to people in Tunisia ({region}).")
 
+    if re.search(r"\btunisia\b", region, re.I):
+        return verdict("yes", "Tunisia is in their list of countries.")
+
+    # "Anywhere in the World, Andorra, Albania, ... South Africa": the list
+    # after it is where they hire. Tunisia missing from a long list = no.
+    countries = [part for part in re.split(r",|\band\b", region) if _REGION_FILLER.sub(" ", part).strip()]
+    named = [part for part in countries if not REMOTE_OPEN_PLACES.search(part)]
+
+    if len(named) >= 5 and not re.search(r"tunisia|(?<!south )africa|\bemea\b|\bmena\b|middle east", region, re.I):
+        return verdict("no", f"Tunisia is not in their list of countries ({len(named)} countries).")
+
     if REMOTE_OPEN_PLACES.search(region) or REMOTE_TIMEZONE_FITS.search(region):
-        return verdict("yes", f"Region: {region}")
+        return verdict("yes", f"Region: {short_region(region)}")
 
     if REMOTE_EUROPE.search(region):
-        return verdict("europe", f"Region: {region}")
+        return verdict("europe", f"Region: {short_region(region)}")
 
     if _REGION_FILLER.sub(" ", region).strip():
         # Names places, none of them yours: "USA Only", "Canada, UK".
-        return verdict("no", f"Region: {region}")
+        return verdict("no", f"Region: {short_region(region)}")
 
     # No region from the board: read the ad.
     for sentence in split_sentences(text or ""):

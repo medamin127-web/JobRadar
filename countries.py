@@ -22,6 +22,9 @@ Fields:
                        Québec and Romandy): jobs there are skipped, with the
                        reason in skip_reason
     remote_search      search with LinkedIn's "remote" filter (the "remote" profile)
+    boards             the country's own job boards (listed_boards.py), read
+                       when the country is searched
+    adzuna             Adzuna's country code (adzuna.py; needs a free key)
     visa_norm          "explicit": silence about visas means probably no
                        (Germany, most of Europe)
                        "employer_sponsored": the employer normally arranges
@@ -49,6 +52,7 @@ COUNTRY_PROFILES = {
 
     "germany": {
         "name": "Germany",
+        "adzuna": "de",
         "jaabz": "germany",
         "location": "Germany",
         "indeed_country": "germany",
@@ -80,6 +84,7 @@ COUNTRY_PROFILES = {
 
     "netherlands": {
         "name": "Netherlands",
+        "adzuna": "nl",
         "jaabz": "netherlands",
         "location": "Netherlands",
         "indeed_country": "netherlands",
@@ -124,6 +129,7 @@ COUNTRY_PROFILES = {
 
     "uk": {
         "name": "United Kingdom",
+        "adzuna": "gb",
         "jaabz": "united-kingdom",
         "location": "United Kingdom",
         "indeed_country": "uk",
@@ -149,6 +155,7 @@ COUNTRY_PROFILES = {
 
     "austria": {
         "name": "Austria",
+        "adzuna": "at",
         "jaabz": "austria",
         "location": "Austria",
         "indeed_country": "austria",
@@ -171,6 +178,7 @@ COUNTRY_PROFILES = {
 
     "switzerland": {
         "name": "Switzerland",
+        "adzuna": "ch",
         "jaabz": "switzerland",
         "location": "Switzerland",
         "indeed_country": "switzerland",
@@ -222,6 +230,8 @@ COUNTRY_PROFILES = {
 
     "poland": {
         "name": "Poland",
+        "boards": ["justjoinit", "nofluffjobs"],
+        "adzuna": "pl",
         "jaabz": "poland",
         "location": "Poland",
         "indeed_country": "poland",
@@ -333,6 +343,7 @@ COUNTRY_PROFILES = {
 
     "japan": {
         "name": "Japan",
+        "boards": ["tokyodev", "japandev"],
         "jaabz": "japan",
         "location": "Japan",
         "indeed_country": "japan",
@@ -357,6 +368,7 @@ COUNTRY_PROFILES = {
 
     "canada": {
         "name": "Canada",
+        "adzuna": "ca",
         "jaabz": "canada",
         "location": "Canada",
         "indeed_country": "canada",

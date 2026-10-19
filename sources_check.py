@@ -10,6 +10,10 @@ Check job sources from your computer before adding them to config.py.
     python sources_check.py stepstone          read StepStone (Germany), one search
     python sources_check.py remote             read the remote boards (REMOTE_BOARDS)
     python sources_check.py remote himalayas   ... only these boards
+    python sources_check.py boards             read the country boards (TokyoDev, Japan Dev,
+                                               Just Join IT, No Fluff Jobs), one list page each
+    python sources_check.py boards tokyodev dump   ... one board, saving its pages in data/samples
+    python sources_check.py adzuna             one Adzuna search per covered country (needs the key)
     python sources_check.py jaabz dump         ... and save its HTML in data/samples
                                                (same for: relocateme dump)
 
@@ -96,6 +100,10 @@ def check_board(name, source, output=print, dump=False):
         jobs = source.fetch()
     except Exception as error:
         output(f"  {name}: unreachable ({error})")
+
+        if "no job links" in str(error):
+            output(f"  If the page opens in your browser, run: python sources_check.py boards {name} dump")
+            output("  and send me the files in data/samples.")
         return None
 
     stats = source.stats
@@ -236,12 +244,74 @@ def check_remote(names=None, output=print, sources=None):
     return working
 
 
+def check_country_boards(names=None, output=print, dump=False):
+    """Read each country board (one list page); say what worked."""
+
+    from sources import BOARDS
+
+    names = names or list(BOARDS)
+    unknown = [name for name in names if name not in BOARDS]
+
+    if unknown:
+        output(f"Unknown board: {', '.join(unknown)}. Known: {', '.join(BOARDS)}")
+        return
+
+    for name in names:
+        output(f"\n{name}:")
+        check_board(name, BOARDS[name](max_pages=1), output, dump)
+
+
+def check_adzuna(output=print, sources=None):
+    """One Adzuna search per country Adzuna covers (in your countries)."""
+
+    from sources import AdzunaSource, adzuna_keys
+
+    app_id, app_key = adzuna_keys()
+
+    if sources is None:
+        if not app_id:
+            output("No Adzuna key. Get one free at https://developer.adzuna.com, then in PowerShell:")
+            output('  setx ADZUNA_APP_ID "your id"')
+            output('  setx ADZUNA_APP_KEY "your key"')
+            output("and open a new terminal.")
+            return
+
+        sources = [
+            AdzunaSource(config, app_id, app_key, terms=config["search_terms"][:1])
+            for config in SEARCH_CONFIGS if config.get("adzuna")
+        ]
+
+    for source in sources:
+        output(f"\n{source.name} ({source.config['name']}):")
+
+        try:
+            jobs = source.fetch()
+        except Exception as error:
+            output(f"  unreachable ({error})")
+            continue
+
+        output(f"  {source.stats.get('listed', 0)} jobs for '{source.terms[0]}'")
+
+        if not jobs.empty:
+            tech = jobs[jobs["title"].map(is_tech_title)]
+
+            if not tech.empty:
+                print_verdicts(tech.head(15), output)
+
+
 def save_samples(name, source, output=print):
     """Save a list page and one job page, to fix the parser if the site changes."""
 
     import os
 
-    if name == "jaabz":
+    from sources import ListedBoard
+
+    if isinstance(source, ListedBoard):
+        LIST_URL = source.list_urls[0]
+        params = None
+        job_links = source.job_links
+        job_url = lambda link: source.base + link[0]
+    elif name == "jaabz":
         from sources.jaabz import BASE, LIST_URL, job_links, list_params
 
         slug = (source.countries or [("germany", "Germany")])[0][0]
@@ -312,6 +382,13 @@ def main(argv=None, output=print):
         return
     elif argv[0] == "remote":
         check_remote(argv[1:] or None, output)
+        return
+    elif argv[0] == "boards":
+        names = [a for a in argv[1:] if a != "dump"]
+        check_country_boards(names or None, output, dump="dump" in argv[1:])
+        return
+    elif argv[0] == "adzuna":
+        check_adzuna(output)
         return
     elif argv[0] in ("greenhouse", "lever") and len(argv) > 1:
         run(argv[0], argv[1:])

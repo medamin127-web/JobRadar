@@ -96,6 +96,19 @@ REMOTE_BOARDS = ["remotive", "remoteok", "weworkremotely", "workingnomads", "him
 # YOUR_COUNTRY; the other boards just give their newest jobs.
 HIMALAYAS_TERMS = ["full stack", "frontend", "react", "backend", "software engineer", "web developer"]
 
+# Country job boards (TokyoDev, Japan Dev for Japan; Just Join IT, No Fluff
+# Jobs for Poland: "boards" in countries.py), read when their country is
+# searched: this many list pages each. 0 = off. Check with:
+#   python sources_check.py boards
+COUNTRY_BOARD_PAGES = 1
+
+# Adzuna: one API for the UK, Germany, Austria, Switzerland, the
+# Netherlands, Poland and Canada. Needs a key (see sources/adzuna.py).
+# Off: a new Adzuna account only gets 25 test calls in total (Oct 2026);
+# real use costs 8 GBP a month, and its jobs come with only ~500
+# characters of text. True = on (about 10 calls per run).
+ADZUNA = False
+
 RESULTS_PER_SEARCH = 10
 HOURS_OLD = 72
 

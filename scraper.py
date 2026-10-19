@@ -27,7 +27,9 @@ happens inside main().
 import argparse
 
 from config import (
+    ADZUNA,
     ARBEITNOW_PAGES,
+    COUNTRY_BOARD_PAGES,
     COUNTRIES_PER_RUN,
     COUNTRY_PRIORITY,
     RELOCATEME_PAGES,
@@ -152,6 +154,17 @@ def build_feeds(known_ids=(), searched=None):
 
     feeds += [GreenhouseSource(board) for board in GREENHOUSE_BOARDS]
     feeds += [LeverSource(company) for company in LEVER_COMPANIES]
+
+    # Country boards and Adzuna: only for the countries searched now.
+    if COUNTRY_BOARD_PAGES:
+        from sources import country_board_sources
+
+        feeds += country_board_sources(searched or SEARCH_CONFIGS, COUNTRY_BOARD_PAGES, known_ids)
+
+    if ADZUNA:
+        from sources import adzuna_sources
+
+        feeds += adzuna_sources(searched or SEARCH_CONFIGS)
 
     # Remote boards: every run, when "remote" is one of your countries.
     if REMOTE_BOARDS and any(config["key"] == "remote" for config in SEARCH_CONFIGS):

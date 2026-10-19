@@ -38,6 +38,9 @@ FEED_SITES = {"arbeitnow", "greenhouse", "lever", "jaabz", "relocateme"}
 REMOTE_SITES = {"remotive", "remoteok", "weworkremotely", "workingnomads", "himalayas"}
 FEED_SITES |= REMOTE_SITES
 
+# Country boards read from list pages (listed_boards.py).
+FEED_SITES |= {"tokyodev", "japandev", "justjoinit", "nofluffjobs"}
+
 # A remote feed job is kept only when its location is just "remote" (or a
 # region that includes your countries), not "Remote, Netherlands" or
 # "Werken op afstand" (Dutch for working remotely).
@@ -164,4 +167,11 @@ def in_target_countries(frame, configs):
     # to Tunisia is decided later (eligibility), not here.
     remote_board = sites.isin(REMOTE_SITES) & ("remote" in keys)
 
-    return (~from_feed & searched) | located | generic_remote | remote_board
+    # A feed that knows the job's country (a country board) counts too.
+    feed_country = (
+        frame["search_country"].map(lambda key: isinstance(key, str) and key in keys)
+        if "search_country" in frame.columns
+        else pd.Series([False] * len(frame), index=frame.index)
+    )
+
+    return (~from_feed & searched) | (from_feed & feed_country) | located | generic_remote | remote_board

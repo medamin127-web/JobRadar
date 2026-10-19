@@ -375,8 +375,9 @@ class ApplicationBucketer:
         ):
             bucket = "apply_with_research"
             reason = (
-                "Strong eligibility signals (visa support) and a relevant "
-                "role; seniority is unclear, so read the listing."
+                ("Open to people in Tunisia (remote)" if job.country == "remote"
+                 else "Strong eligibility signals (visa support)")
+                + " and a relevant role; seniority is unclear, so read the listing."
             )
 
         elif status == "likely" and category == "stretch_target" and score >= 55:
@@ -390,7 +391,9 @@ class ApplicationBucketer:
             bucket = "apply_with_research"
             reason = (
                 "Good technical fit; eligibility not confirmed, so check "
-                "visa and language details before applying."
+                + ("whether they hire people in Tunisia" if job.country == "remote"
+                   else "visa and language details")
+                + " before applying."
             )
 
         elif (

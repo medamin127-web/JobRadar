@@ -77,10 +77,17 @@ def print_ranking(job_objects) -> None:
             f"Target: {job.target_category or 'unknown':14} | "
             f"{job.title} | "
             f"{job.company} | "
-            f"{job.location}{_country_text(job)}"
+            f"{_short(job.location)}{_country_text(job)}"
             f"{_age_text(job)}"
             f" | id {short_id(job.id)}"
         )
+
+
+def _short(text, limit=60) -> str:
+    """Long locations ("Anywhere in the World, Andorra, Albania, ...") cut short."""
+
+    text = str(text or "")
+    return text if len(text) <= limit else text[:limit].rsplit(",", 1)[0] + ", ..."
 
 
 def country_name(key) -> str:
@@ -202,7 +209,7 @@ def print_details(job_objects) -> None:
         print(f"Company: {job.company}")
         print(f"Id: {short_id(job.id)}   Posted/first seen: {job.age_days} days ago   Status: {job.status}")
         print(f"Found on: {job.found_on or job.site}   {job.job_url or ''}")
-        print(f"Location: {job.location}   Country: {country_name(job.country)}")
+        print(f"Location: {_short(job.location, 200)}   Country: {country_name(job.country)}")
         print(f"Match Score: {job.match_score}/100")
         print(f"Confidence: {job.confidence}")
         print(f"Coverage: {job.match_coverage}%")
