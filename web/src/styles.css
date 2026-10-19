@@ -1,0 +1,498 @@
+/*
+  JobRadar: a plain, light working dashboard.
+
+  Paper and slate ink; one blue for actions and focus. Colour is kept for
+  one job only: telling the five buckets apart (the bar beside each job
+  and its score).
+*/
+
+:root {
+  --paper: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #1d2a31;
+  --muted: #5f6c73;
+  --rule: #d9dfdc;
+  --action: #2b4a9e;
+  --action-soft: #e6ebf7;
+
+  --apply-now: #17744a;
+  --research: #2b4a9e;
+  --long-shot: #9a5f0e;
+  --review: #66707a;
+  --skip: #9c3a3a;
+
+  --font: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.0625rem;
+  --step-2: 1.375rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 100%;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- top bar */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand {
+  margin: 0;
+  font-size: var(--step-2);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.search {
+  flex: 1;
+  max-width: 28rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+}
+
+.search:focus {
+  background: var(--surface);
+}
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--action);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--action);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--action-soft);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.notice,
+.waiting {
+  margin: 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--skip);
+  background: var(--surface);
+  max-width: 70ch;
+}
+
+.waiting {
+  border-left-color: var(--action);
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.main {
+  padding: 1rem 1.5rem 3rem;
+  max-width: 68rem;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+.sidebar {
+  position: sticky;
+  top: 3.75rem;
+  max-height: calc(100vh - 3.75rem);
+  overflow-y: auto;
+  padding: 1rem 0.75rem 2rem 1.5rem;
+}
+
+.views {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 1.5rem;
+}
+
+.view,
+.country {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.view {
+  font-weight: 600;
+}
+
+.view:hover,
+.country:hover {
+  background: #e8ece9;
+}
+
+.view.is-on,
+.country.is-on {
+  background: var(--action-soft);
+  color: var(--action);
+}
+
+.sidebar-title {
+  margin: 0 0 0.4rem 0.6rem;
+  font-size: var(--step--1);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.countries {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.country.is-on .count {
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- tabs */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.6rem 0 0.7rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The selected tab is underlined in its bucket's colour. */
+.tab.is-on {
+  color: var(--ink);
+}
+
+.tab.is-on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--tab-colour, var(--ink));
+}
+
+.tab-apply_now { --tab-colour: var(--apply-now); }
+.tab-apply_with_research { --tab-colour: var(--research); }
+.tab-long_shot { --tab-colour: var(--long-shot); }
+.tab-review { --tab-colour: var(--review); }
+.tab-skip { --tab-colour: var(--skip); }
+
+/* ---------------------------------------------------------------- toolbar */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 0;
+  font-size: var(--step--1);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--action);
+}
+
+.sort {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+}
+
+.sort select {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- jobs */
+
+.jobs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.jobs.is-loading {
+  opacity: 0.6;
+}
+
+.job {
+  --mark: var(--review);
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+  gap: 0 1rem;
+  padding: 0.9rem 1.1rem 0.9rem 0;
+  border-bottom: 1px solid var(--rule);
+  box-shadow: inset 4px 0 0 var(--mark);
+}
+
+.job:last-child {
+  border-bottom: 0;
+}
+
+.job-apply_now { --mark: var(--apply-now); }
+.job-apply_with_research { --mark: var(--research); }
+.job-long_shot { --mark: var(--long-shot); }
+.job-review { --mark: var(--review); }
+.job-skip { --mark: var(--skip); }
+
+/* The score, in the bucket's colour: the one loud thing on the page. */
+.score {
+  padding-left: 0.5rem;
+  text-align: center;
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--mark);
+  font-variant-numeric: tabular-nums;
+}
+
+.job-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.job-title {
+  font-size: var(--step-1);
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.job-title:hover {
+  color: var(--action);
+  text-decoration: underline;
+}
+
+.new {
+  padding: 0 0.4rem;
+  border-radius: 3px;
+  background: var(--action-soft);
+  color: var(--action);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1rem;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.company {
+  color: var(--ink);
+}
+
+.reason {
+  margin: 0.4rem 0 0;
+  max-width: 70ch;
+  font-size: var(--step-0);
+}
+
+.job-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  text-align: right;
+  font-size: var(--step--1);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.elig {
+  font-weight: 700;
+}
+
+.elig-likely { color: var(--apply-now); }
+.elig-unlikely,
+.elig-blocked { color: var(--skip); }
+.elig-possible { color: var(--ink); }
+
+.empty {
+  padding: 2rem 0;
+  color: var(--muted);
+}
+
+.more {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.more:hover:not(:disabled) {
+  border-color: var(--action);
+  color: var(--action);
+}
+
+/* ---------------------------------------------------------------- narrow screens */
+
+@media (max-width: 52rem) {
+  .top {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .search {
+    order: 3;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    padding: 0.75rem 1rem 0;
+  }
+
+  .views {
+    flex-direction: row;
+  }
+
+  .countries {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+
+  .country {
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .main {
+    padding: 0.5rem 1rem 2rem;
+  }
+
+  .job {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+  }
+
+  .job-side {
+    grid-column: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    margin-top: 0.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

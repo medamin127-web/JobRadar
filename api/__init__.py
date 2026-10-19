@@ -1,0 +1,1 @@
+"""JobRadar's web API (FastAPI): serves the ranked jobs to the dashboard in web/."""

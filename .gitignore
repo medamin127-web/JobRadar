@@ -37,3 +37,11 @@ candidate_profile.py
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Web dashboard (web/): installed packages and the built site
+web/node_modules/
+web/dist/
+# ...but keep the dashboard's own settings files (*.json is ignored above)
+!web/package.json
+!web/package-lock.json
+!web/tsconfig.json

@@ -2,5 +2,11 @@ pandas==3.0.6
 python-jobspy==1.3.0
 requests>=2.31
 
+# Dashboard API (Phase 5): uvicorn api.server:app --port 8000
+fastapi>=0.115
+uvicorn>=0.30
+# Needed by the API tests (tests/test_api.py); newer FastAPI versions ask for httpx2.
+httpx2
+
 # Optional: only if StepStone refuses plain requests (python sources_check.py stepstone)
 # curl_cffi
