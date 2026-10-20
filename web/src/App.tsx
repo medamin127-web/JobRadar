@@ -12,6 +12,7 @@ import {
   refreshRanking,
 } from "./api";
 import { BucketTabs, JobList, Toolbar } from "./components/JobList";
+import { JobDetail } from "./components/JobDetail";
 import { Sidebar } from "./components/Sidebar";
 
 const PAGE = 100;
@@ -52,6 +53,9 @@ function writeFilters(f: Filters) {
   if (f.remote) p.set("remote", "1");
   if (f.sort !== DEFAULTS.sort) p.set("sort", f.sort);
 
+  const job = new URLSearchParams(window.location.search).get("job");
+  if (job) p.set("job", job);
+
   const query = p.toString();
   window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
 }
@@ -73,6 +77,10 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const request = useRef(0);
+  // The open job, in the address bar too (?job=...), so a reload keeps it.
+  const [openJob, setOpenJob] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("job"),
+  );
 
   // 1. Wait until the API has ranked the jobs (20-40 s after it starts).
   useEffect(() => {
@@ -151,6 +159,21 @@ export default function App() {
     }
   }
 
+  function openDetails(id: string | null) {
+    setOpenJob(id);
+    const p = new URLSearchParams(window.location.search);
+    if (id) p.set("job", id);
+    else p.delete("job");
+    const query = p.toString();
+    window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
+  }
+
+  // After you mark a job: reload the list and the counts (it may leave this view).
+  function statusChanged() {
+    setFilters((current) => ({ ...current }));
+    getOverview().then(setOverview).catch(() => undefined);
+  }
+
   const countryTotal = data ? data.countries.reduce((sum, c) => sum + c.count, 0) : 0;
 
   return (
@@ -209,10 +232,16 @@ export default function App() {
               jobs={data?.items ?? []}
               total={data?.total ?? 0}
               loading={loading}
+              selected={openJob}
+              onOpen={(id) => openDetails(id)}
               onMore={() => setLimit((n) => n + PAGE)}
             />
           </main>
         </div>
+      )}
+
+      {ready && openJob && (
+        <JobDetail id={openJob} onClose={() => openDetails(null)} onStatusChanged={statusChanged} />
       )}
     </div>
   );

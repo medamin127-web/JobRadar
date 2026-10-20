@@ -167,6 +167,35 @@ def read_labels(path: str) -> pd.DataFrame:
     raise SystemExit(f"Could not read {path}: unknown text encoding.")
 
 
+# What you did in the dashboard (or with track.py) answers "would you apply?"
+# for jobs you have not labelled: applied = yes, not interested = no.
+# ("closed" says nothing about you.) Your own labels always win.
+STATUS_ANSWERS = {"applied": "yes", "not_interested": "no"}
+
+
+def answers_from_dashboard(frame: pd.DataFrame, info: dict) -> pd.DataFrame:
+    if frame.empty or "id" not in frame.columns:
+        return frame
+
+    frame = frame.copy()
+
+    if "true_would_apply" not in frame.columns:
+        frame["true_would_apply"] = ""
+
+    frame["true_would_apply"] = frame["true_would_apply"].astype(object)
+
+    for index, row in frame.iterrows():
+        if _is_answered(row.get("true_would_apply")):
+            continue
+
+        answer = STATUS_ANSWERS.get((info.get(row["id"]) or {}).get("status"))
+
+        if answer:
+            frame.at[index, "true_would_apply"] = answer
+
+    return frame
+
+
 def export(path: str = LABELS_FILE, quiet: bool = False) -> None:
     from scraper import load_profile, open_store
 
@@ -180,11 +209,13 @@ def export(path: str = LABELS_FILE, quiet: bool = False) -> None:
 
         registers = sponsors.load_for(SEARCH_CONFIGS, auto_update=False, output=lambda *_: None)
         jobs = process_jobs(assign_countries(raw, SEARCH_CONFIGS), load_profile(), registers=registers)
+        info = store.info()
 
     jobs.sort(key=lambda j: BUCKET_ORDER.get(j.application_bucket, 9))
 
     previous = read_labels(path) if os.path.exists(path) else None
     frame = build_rows(jobs, previous)
+    frame = answers_from_dashboard(frame, info)
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
 

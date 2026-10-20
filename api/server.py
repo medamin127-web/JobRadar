@@ -186,6 +186,12 @@ def job_detail(job_id: str):
     data["country_name"] = country_label(job.country)
     data["bucket_reason"] = reason_text(job.bucket_reason)
 
+    # Skill names as written in job ads ("React", not "react").
+    names = {str(skill).lower(): skill for skill in (job.skills or [])}
+    nice = lambda skills: [names.get(str(s).lower(), str(s)) for s in skills or []]
+    data["matched_skills"] = nice(job.matched_skills)
+    data["missing_skills"] = nice(job.missing_skills)
+
     # The same signals in plain words.
     data["blockers_text"] = codes_text(job.eligibility_blockers)
     data["warnings_text"] = codes_text(job.eligibility_warnings)

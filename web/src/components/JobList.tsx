@@ -70,20 +70,26 @@ export function Toolbar({ onlyNew, onlyRemote, sort, onNew, onRemote, onSort }: 
   );
 }
 
-function JobRow({ job }: { job: JobSummary }) {
+function JobRow({ job, selected, onOpen }: { job: JobSummary; selected: boolean; onOpen: (id: string) => void }) {
   const eligibility = eligibilityText(job);
   const mode = workModeText(job.work_mode);
 
   return (
-    <li className={`job job-${job.bucket}`}>
+    <li className={`job job-${job.bucket}${selected ? " is-selected" : ""}`} onClick={() => onOpen(job.id)}>
       <div className="score" title="How well the job matches your skills and experience, out of 100">
         {job.score}
       </div>
       <div className="job-body">
         <div className="job-head">
-          <a className="job-title" href={job.job_url ?? undefined} target="_blank" rel="noreferrer">
+          <button
+            className="job-title"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen(job.id);
+            }}
+          >
             {job.title || "Untitled job"}
-          </a>
+          </button>
           {job.is_new && <span className="new">New</span>}
         </div>
         <div className="job-meta">
@@ -107,10 +113,12 @@ interface ListProps {
   jobs: JobSummary[];
   total: number;
   loading: boolean;
+  selected: string | null;
+  onOpen: (id: string) => void;
   onMore: () => void;
 }
 
-export function JobList({ jobs, total, loading, onMore }: ListProps) {
+export function JobList({ jobs, total, loading, selected, onOpen, onMore }: ListProps) {
   if (!loading && jobs.length === 0) {
     return (
       <p className="empty">
@@ -123,7 +131,7 @@ export function JobList({ jobs, total, loading, onMore }: ListProps) {
     <>
       <ol className={loading ? "jobs is-loading" : "jobs"} aria-busy={loading}>
         {jobs.map((job) => (
-          <JobRow key={job.id} job={job} />
+          <JobRow key={job.id} job={job} selected={job.id === selected} onOpen={onOpen} />
         ))}
       </ol>
       {jobs.length < total && (

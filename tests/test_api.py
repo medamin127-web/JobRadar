@@ -30,7 +30,8 @@ def job(id, bucket, country, score, **extra):
 def snapshot():
     jobs = [
         job("a", "apply_now", "germany", 80),
-        job("b", "apply_with_research", "germany", 70, title="React Engineer"),
+        job("b", "apply_with_research", "germany", 70, title="React Engineer",
+            skills=["React", "Docker"], matched_skills=["react"], missing_skills=["docker"]),
         job("c", "apply_with_research", "remote", 65, work_mode="remote", remote_open="yes",
             first_seen="2026-10-19T09:00:00"),
         job("d", "skip", "uae", 60, bucket_reason="Blocked: NATIONALS_ONLY",
@@ -91,9 +92,36 @@ class TestApi(unittest.TestCase):
     def test_one_job(self):
         data = self.client.get("/api/jobs/d").json()
 
+        b = self.client.get("/api/jobs/b").json()
+        self.assertEqual(b["matched_skills"], ["React"])         # as written in ads
+
         self.assertEqual(data["title"], "Developer d")
         self.assertEqual(data["blockers_text"], ["Only for citizens of that country"])
         self.assertEqual(self.client.get("/api/jobs/zzz").status_code, 404)
+
+    def test_marking_a_job(self):
+        import tempfile
+        from unittest import mock
+
+        from database import JobStore
+
+        with tempfile.TemporaryDirectory() as folder:
+            store = JobStore(f"{folder}/jobs.db")
+            store.save_scraped(__import__("pandas").DataFrame([{"id": "a", "site": "linkedin", "title": "Developer a"}]))
+            opened = lambda: JobStore(f"{folder}/jobs.db")
+
+            with mock.patch("scraper.open_store", opened):
+                answer = self.client.post("/api/jobs/a/status", json={"status": "applied", "note": "20 Oct"})
+
+            self.assertEqual(answer.status_code, 200, answer.text)
+            self.assertEqual(answer.json()["status"], "applied")
+            self.assertEqual(opened().info()["a"]["status"], "applied")
+            store.close()
+
+        # It leaves the ranking and shows under "applied".
+        self.assertNotIn("a", [i["id"] for i in self.get()["items"]])
+        self.assertIn("a", [i["id"] for i in self.get(view="applied")["items"]])
+        self.assertEqual(self.client.post("/api/jobs/a/status", json={"status": "nope"}).status_code, 400)
 
     def test_bad_parameters(self):
         self.assertEqual(self.client.get("/api/jobs", params={"view": "nope"}).status_code, 400)
@@ -117,3 +145,24 @@ class TestExplain(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDashboardAnswersCount(unittest.TestCase):
+
+    def test_statuses_become_would_apply_answers(self):
+        import pandas as pd
+
+        from labels import answers_from_dashboard
+
+        frame = pd.DataFrame([
+            {"id": "a", "true_would_apply": ""},
+            {"id": "b", "true_would_apply": None},
+            {"id": "c", "true_would_apply": "yes"},     # your own label wins
+            {"id": "d", "true_would_apply": ""},
+        ])
+        info = {"a": {"status": "applied"}, "b": {"status": "not_interested"},
+                "c": {"status": "not_interested"}, "d": {"status": "closed"}}
+
+        out = answers_from_dashboard(frame, info)
+
+        self.assertEqual(list(out["true_would_apply"].fillna("")), ["yes", "no", "yes", ""])
