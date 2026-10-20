@@ -69,6 +69,7 @@ class ListedBoard:
         hint=None,
         badges=None,
         title_from=None,
+        extras=None,
         max_pages=1,
         page_param="page",
         known_ids=(),
@@ -88,6 +89,9 @@ class ListedBoard:
         self.hint = hint
         self.badges = badges or []
         self.title_from = title_from or (lambda path: _words(path.rstrip("/").rsplit("/", 1)[-1]))
+        # extras(page, path) -> {"level": "Senior", "text": "..."}: what a
+        # board shows beside the ad text (Just Join IT: level, languages).
+        self.extras = extras
         self.max_pages = max_pages
         self.page_param = page_param
         self.known_ids = set(known_ids)
@@ -229,6 +233,11 @@ class ListedBoard:
             if badges:
                 description = " ".join(badges) + "\n\n" + description
 
+            facts = self.extras(page, path) if self.extras else {}
+
+            if facts.get("text"):
+                description = description + "\n\n" + facts["text"]
+
             location, country, remote = self.place(job["location"])
 
             rows.append({
@@ -240,6 +249,7 @@ class ListedBoard:
                 "location": location,
                 "is_remote": bool(job["is_remote"]) or remote,
                 "search_country": country,
+                "job_level": facts.get("level"),
                 "description": description,
                 "search_term": self.name,
                 "source_hint": self.hint,
@@ -285,6 +295,72 @@ def japandev(**kwargs) -> ListedBoard:
     )
 
 
+# Just Join IT's page data (Next.js), around the ad's own "slug":
+#   \"experienceLevel\":{\"label\":\"senior\" ... \"languages\":[{\"code\":\"pl\",\"level\":\"C1\"}]
+_JJ_LEVEL = re.compile(r'experienceLevel\\?"\s*:\s*(?:\{\\?"label\\?"\s*:\s*)?\\?"([a-z_]+)')
+_JJ_LANGUAGES = re.compile(r'\\?"languages\\?"\s*:\s*\[(.*?)\]')
+_JJ_LANGUAGE = re.compile(r'code\\?"\s*:\s*\\?"([a-z]{2})\\?"\s*,\s*\\?"level\\?"\s*:\s*\\?"([A-C][12])')
+_JJ_SKILLS = re.compile(r'\\?"requiredSkills\\?"\s*:\s*\[(.*?)\]')
+_JJ_SKILL = re.compile(r'\\?"name\\?"\s*:\s*\\?"([^"\\]+)')
+_JJ_WORKPLACE = re.compile(r'workplaceType\\?"\s*:\s*(?:\{\\?"label\\?"\s*:\s*)?\\?"([a-z_]+)')
+
+JJ_LEVELS = {"junior": "Junior", "mid": "Mid", "senior": "Senior", "c_level": "Lead", "manager": "Lead"}
+LANGUAGE_NAMES = {
+    "pl": "Polish", "en": "English", "de": "German", "fr": "French", "es": "Spanish",
+    "it": "Italian", "ru": "Russian", "uk": "Ukrainian", "cs": "Czech", "nl": "Dutch",
+    "pt": "Portuguese", "sv": "Swedish", "ja": "Japanese", "ar": "Arabic",
+}
+
+
+def justjoinit_facts(page: str, path: str) -> dict:
+    """Level, languages, skills and work mode of the ad itself (not the
+    "similar offers" further down the same page)."""
+
+    slug = path.rstrip("/").rsplit("/", 1)[-1]
+    start = page.find(f'slug\\":\\"{slug}\\"')
+
+    if start < 0:
+        start = page.find(f'"slug":"{slug}"')
+
+    if start < 0:
+        return {}
+
+    # The ad's fields follow its slug (checked on a saved page, Oct 2026).
+    area = page[start: start + 6000]
+    facts, lines = {}, []
+
+    level = _JJ_LEVEL.search(area)
+
+    if level and level.group(1) in JJ_LEVELS:
+        facts["level"] = JJ_LEVELS[level.group(1)]
+        lines.append(f"Experience level: {facts['level']}.")
+
+    languages = _JJ_LANGUAGES.search(area)
+
+    if languages:
+        found = [
+            f"{LANGUAGE_NAMES.get(code, code.upper())} ({grade})"
+            for code, grade in _JJ_LANGUAGE.findall(languages.group(1))
+        ]
+        if found:
+            lines.append("Language requirements: " + ", ".join(found) + ".")
+
+    skills = _JJ_SKILLS.search(area)
+
+    if skills:
+        names = list(dict.fromkeys(_JJ_SKILL.findall(skills.group(1))))
+        if names:
+            lines.append("Required skills: " + ", ".join(names) + ".")
+
+    workplace = _JJ_WORKPLACE.search(area)
+
+    if workplace and workplace.group(1) in ("remote", "hybrid"):
+        lines.append(f"Work mode: {workplace.group(1)}.")
+
+    facts["text"] = "\n".join(lines)
+    return facts
+
+
 def justjoinit(**kwargs) -> ListedBoard:
     return ListedBoard(
         name="justjoinit",
@@ -296,6 +372,7 @@ def justjoinit(**kwargs) -> ListedBoard:
         ],
         link_pattern=r"""href=["'](?:https?://justjoin\.it)?(/job-offer/[a-z0-9-]+)["']""",
         country_name="Poland",
+        extras=justjoinit_facts,
         country_key="poland",
         country_codes=("pl", "pol"),
         **kwargs,

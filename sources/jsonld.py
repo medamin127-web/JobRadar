@@ -203,6 +203,49 @@ def best_description(job: dict, page: str) -> str:
     return text if len(text) > len(description) else description
 
 
+# JobPosting fields some sites fill besides the description: the level,
+# skills or languages they show as labels next to the text (Just Join IT:
+# "Mid", "Polish C2"). Added to the description so the analysis reads them.
+_EXTRA_FIELDS = [
+    ("experienceRequirements", "Experience"),
+    ("qualifications", "Qualifications"),
+    ("skills", "Skills"),
+    ("educationRequirements", "Education"),
+    ("occupationalCategory", "Category"),
+]
+
+
+def _field_text(value) -> str:
+    if isinstance(value, dict):
+        parts = [value.get("name"), value.get("description"), value.get("credentialCategory")]
+        months = value.get("monthsOfExperience")
+
+        if months not in (None, ""):
+            try:
+                parts.append(f"{float(months) / 12:g} years of experience")
+            except (TypeError, ValueError):
+                pass
+
+        return ", ".join(str(p) for p in parts if p)
+
+    if isinstance(value, list):
+        return ", ".join(t for t in (_field_text(v) for v in value) if t)
+
+    return html_to_text(str(value)) if value not in (None, "") else ""
+
+
+def _extra_fields(posting) -> str:
+    lines = []
+
+    for key, label in _EXTRA_FIELDS:
+        text = _field_text(posting.get(key))
+
+        if text and len(text) < 2000:
+            lines.append(f"{label}: {text}")
+
+    return ("\n\n" + "\n".join(lines)) if lines else ""
+
+
 def parse_job_page(page: str) -> dict:
     """
     -> {title, company, location, date_posted, is_remote, job_type,
@@ -225,7 +268,7 @@ def parse_job_page(page: str) -> dict:
             "date_posted": str(posting.get("datePosted") or "")[:10] or None,
             "is_remote": remote,
             "job_type": job_type,
-            "description": html_to_text(posting.get("description")),
+            "description": html_to_text(posting.get("description")) + _extra_fields(posting),
             "structured": True,
         }
 

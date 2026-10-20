@@ -3,6 +3,10 @@ import re
 from models import Job
 
 
+# Experience asked above this (years) is about the company, not you.
+MAX_PLAUSIBLE_YEARS = 15
+
+
 class ExperienceAnalyzer:
     """Extract experience requirements and seniority from job listings."""
 
@@ -120,11 +124,27 @@ class ExperienceAnalyzer:
 
         min_years, max_years = self.extract_years(description)
 
+        # "200 years of history", "25 years on the market": the company, not
+        # the experience asked.
+        if min_years is not None and min_years > MAX_PLAUSIBLE_YEARS:
+            min_years, max_years = None, None
+
         job.experience_min_years = min_years
         job.experience_max_years = max_years
-        job.seniority = self.extract_seniority(title)
+        # The title first ("Senior ..."); else the level the job board shows
+        # beside the ad (Just Join IT: "Mid").
+        job.seniority = self.extract_seniority(title) or self.board_level(job.job_level)
 
         return job
+
+    BOARD_LEVELS = {
+        "intern": "Intern", "internship": "Intern", "junior": "Junior", "entry level": "Junior",
+        "mid": "Mid", "regular": "Mid", "senior": "Senior", "lead": "Lead",
+    }
+
+    @classmethod
+    def board_level(cls, level):
+        return cls.BOARD_LEVELS.get(str(level or "").strip().lower())
 
     def extract_years(self, text: str):
         if not text:

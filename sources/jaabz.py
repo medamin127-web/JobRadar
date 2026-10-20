@@ -90,6 +90,33 @@ _DETAIL = re.compile(
 LINKEDIN_JOB = re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*-)?(\d{6,})", re.IGNORECASE)
 
 
+# Jaabz's own summary of the ad: years asked, responsibilities, skills,
+# benefits ("Visa sponsorship", "Relocation package"), nice to have.
+_SUMMARY_SECTION = re.compile(
+    r'<div[^>]*class="ai-(summary-text|key-points|responsibilities|requirements|qualifications'
+    r'|hard-skills|soft-skills|benefits|nice-to-have)"[^>]*>',
+    re.IGNORECASE,
+)
+_SECTION_END = re.compile(r'<div[^>]*class="(?:ai-|category-links-box)|Job Description', re.IGNORECASE)
+
+
+def summary_sections(page: str) -> str:
+    """The summary boxes of a Jaabz job page as plain text (headings kept)."""
+
+    parts = []
+
+    for match in _SUMMARY_SECTION.finditer(page or ""):
+        rest = page[match.end():]
+        end = _SECTION_END.search(rest)
+        chunk = rest[: end.start() if end else 6000]
+        text = re.sub(r"\n\s*\n+", "\n", html_to_text(chunk)).strip()
+
+        if text:
+            parts.append(text)
+
+    return "\n\n".join(parts)
+
+
 def _main_part(page: str) -> str:
     """The job itself: before the first list of other jobs ("premium" cards)."""
 
@@ -132,6 +159,7 @@ def read_job_page(page: str) -> dict:
         "original_url": (original.group(1) or original.group(2)) if original else None,
         "badges": badges,
         "details": details,
+        "summary": summary_sections(main),
     }
 
 
@@ -334,6 +362,11 @@ class JaabzSource:
             if len(full) > len(description):
                 description = full
                 self.stats["full_text"] = self.stats.get("full_text", 0) + 1
+
+            # Jaabz's summary boxes hold what the excerpt often lacks: years
+            # asked, skills, benefits (visa, relocation).
+            if details["summary"]:
+                description = description + "\n\nSummary on Jaabz:\n" + details["summary"]
 
             facts = [f"{label}: {value}" for label, value in details["details"].items()]
 

@@ -99,6 +99,7 @@ class TestEvaluator(unittest.TestCase):
         j = run(job(relocation_support="yes"))
         self.assertEqual(j.eligibility_status, "possible")
         self.assertIn("RELOCATION_SUPPORT", j.eligibility_positives)
+        # Apply now needs an explicit visa (or remote-from-Tunisia) signal.
         self.assertEqual(j.application_bucket, "apply_with_research")
 
     def test_visa_support_without_warnings_is_likely(self):
@@ -180,10 +181,11 @@ class TestRealWorldRegressions(unittest.TestCase):
                     visa_sponsorship_status="yes", relocation_support="yes"))
         self.assertEqual(j.application_bucket, "apply_with_research")
 
-    def test_irrelevant_role_with_visa_stays_in_review(self):
+    def test_irrelevant_role_with_visa_is_not_recommended(self):
+        # Before 5a this went to "review"; an unrelated role is skipped now.
         j = run(job(target_category="needs_review", match_score=61,
                     role_match_score=0, relocation_support="yes"))
-        self.assertEqual(j.application_bucket, "review")
+        self.assertEqual(j.application_bucket, "skip")
 
 
 if __name__ == "__main__":

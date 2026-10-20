@@ -207,6 +207,13 @@ def parse_args(argv=None):
         help="search every country in config.py this time",
     )
 
+    parser.add_argument(
+        "--reread",
+        action="store_true",
+        help="open every job page of the boards again (Jaabz, Relocate.me, TokyoDev...), "
+             "even jobs already saved, to pick up text JobRadar now reads",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -337,7 +344,10 @@ def collect(args, store):
             )
 
         configs = [c for c in ranking if c["key"] in chosen]
-        scraped = scrape(configs, ranking, known_ids=set(store.info()))
+        # --reread: open saved jobs' pages again (their longer text replaces
+        # the old one in the database).
+        known = set() if getattr(args, "reread", False) else set(store.info())
+        scraped = scrape(configs, ranking, known_ids=known)
         store.mark_searched(chosen)
 
         # Recover descriptions LinkedIn refused to serve (HTTP 429)

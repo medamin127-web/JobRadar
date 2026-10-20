@@ -4,8 +4,8 @@ import type { Bucket, JobSummary } from "./api";
 export const BUCKETS: { key: Bucket; label: string; hint: string }[] = [
   { key: "apply_now", label: "Apply now", hint: "Good fit, and the visa or remote side looks right" },
   { key: "apply_with_research", label: "Worth a closer look", hint: "Promising; read the ad before applying" },
-  { key: "long_shot", label: "Long shots", hint: "Above your level, or the visa side is unclear" },
-  { key: "review", label: "Decide yourself", hint: "Too little information in the ad to judge" },
+  { key: "long_shot", label: "Long shots", hint: "Above your level, a partial match, or the visa side is unclear" },
+  { key: "review", label: "Decide yourself", hint: "The ad's text could not be read; open it to judge" },
   { key: "skip", label: "Skipped", hint: "Blocked or a poor fit" },
 ];
 

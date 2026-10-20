@@ -79,10 +79,16 @@ ROLE_FAMILIES = {
         "anwendungsentwickler",
         "applikationsentwickler",
         "application developer",
+        # At startups a "product engineer" builds the product end to end.
+        "product engineer",
     ],
 
     "web_development": [
         "web developer",
+        "website developer",
+        "web engineer",
+        "web application developer",
+        "web app developer",
         "webentwickler",
         "webentwicklerin",
     ],

@@ -18,6 +18,14 @@ DEFAULT_REQUIRED_GERMAN_LEVEL = 3  # B1
 # being recommended: the score is built on too many unknowns.
 MIN_COVERAGE_TO_RECOMMEND = 60
 
+# An ad shorter than this (characters) could not really be read: the site
+# refused the text (LinkedIn 429) or the ad was removed.
+SHORT_AD = 400
+
+# An ad that states no years and no level is recommended from this skills
+# score up (role score 50+ too); 50 to this = long shot; below = skipped.
+UNSTATED_LEVEL_MIN_SCORE = 60
+
 # Yearly salary (EUR) above which a role is unlikely to be junior-level.
 SENIOR_SALARY_HINT_EUR = 80000
 
@@ -333,11 +341,12 @@ class ApplicationBucketer:
             bucket = "skip"
             reason = "Technical gap: " + (job.target_reason or "low priority")
 
-        elif coverage < MIN_COVERAGE_TO_RECOMMEND:
+        elif coverage < MIN_COVERAGE_TO_RECOMMEND and len((job.description or "").strip()) < SHORT_AD:
+            # Nothing to judge: the site refused the text, or the ad is gone.
             bucket = "review"
             reason = (
-                f"Too little data extracted (coverage {coverage:.0f}%); "
-                "read the listing before trusting the score."
+                "The ad's text could not be read (the site refused it or the ad "
+                "was removed); open the link to judge it yourself."
             )
 
         elif score < MIN_SCORE_TO_CONSIDER:
@@ -358,6 +367,7 @@ class ApplicationBucketer:
         ):
             bucket = "apply_now"
             reason = "Good technical fit and eligibility signals are positive."
+
 
         elif status == "likely" and category == "good_target":
             bucket = "apply_with_research"
@@ -421,6 +431,31 @@ class ApplicationBucketer:
             bucket = "long_shot" if category == "good_target" else "skip"
 
             reason = "Probably needs German or a work permit you do not have."
+
+        elif category == "needs_review" and status in ("likely", "possible"):
+            # The ad states no years and no level ("Strong experience with
+            # Java"): judge it on the skills and the role.
+            if score >= UNSTATED_LEVEL_MIN_SCORE and (job.role_match_score or 0) >= 50:
+                bucket = "apply_with_research"
+                reason = (
+                    "Good skills match. The ad does not say how much experience it "
+                    "wants: check that"
+                    + (", and whether they hire people in Tunisia," if job.country == "remote"
+                       else ", and the visa side,")
+                    + " before applying."
+                )
+            elif score >= 50 and (job.role_match_score or 0) >= 50:
+                bucket = "long_shot"
+                reason = "Partial skills match, and the ad does not say what level it wants."
+            elif (job.role_match_score or 0) < 50 and (job.skills_match_score or 0) >= 60:
+                bucket = "long_shot"
+                reason = "The title is not one of your target roles, but your skills fit the ad."
+            elif (job.role_match_score or 0) < 50:
+                bucket = "skip"
+                reason = "Not the kind of role you are looking for (by its title)."
+            else:
+                bucket = "skip"
+                reason = f"Weak technical match ({score:.0f}/100) and no level stated."
 
         else:
             bucket = "review"
