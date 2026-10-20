@@ -106,6 +106,21 @@ ROLE_FAMILIES = {
 }
 
 
+# Specialised fields you labelled "not my field", even when the title also
+# says "Software Engineer" or "Full-Stack". Edit this list to change it.
+OUTSIDE_YOUR_FIELD = re.compile(
+    r"robotic\w*|forward[- ]deployed|\bfounding\b|c\+\+|\bembedded\b|firmware"
+    r"|\bml systems\b|machine learning|\bml engineer|ai infrastructure|ai platform"
+    r"|voice ai|\bllms?\b|ai product engineer|salesforce|servicenow"
+    r"|dynamics 365|mainframe|cobol",
+    re.IGNORECASE,
+)
+OUTSIDE_FIELD_SCORE = 20
+
+GRADUATE_PROGRAMME = re.compile(r"graduate (?:programme|program|scheme)|\bgraduate\b.*\b20\d\d\b", re.IGNORECASE)
+GRADUATE_SCORE = 80
+
+
 TECH_ROLE_FAMILIES = {
     "react": [
         "react developer",
@@ -357,6 +372,41 @@ class JobMatcher:
 
     @classmethod
     def match_role(cls, job: Job, profile: Profile):
+        """
+        How well the job title matches your target roles, then two
+        corrections from your labels (Oct 2026):
+
+          - specialised fields you said are not yours (robotics, C++,
+            forward-deployed, founding engineer, ML/AI infrastructure,
+            voice AI, SAP...) score low even when the title also says
+            "Software Engineer";
+          - graduate programmes count as your field.
+        """
+
+        result = cls._title_role_match(job, profile)
+        title = str(job.title or "")
+
+        off_field = OUTSIDE_YOUR_FIELD.search(title)
+
+        if off_field:
+            result = {
+                **result,
+                "score": min(result["score"], OUTSIDE_FIELD_SCORE),
+                "match_type": "outside_field",
+                "reason": f"A specialised field outside yours ({off_field.group(0).strip()}).",
+            }
+        elif GRADUATE_PROGRAMME.search(title) and result["score"] < GRADUATE_SCORE:
+            result = {
+                **result,
+                "score": GRADUATE_SCORE,
+                "match_type": "graduate_programme",
+                "reason": "A graduate programme: open to someone at your stage.",
+            }
+
+        return result
+
+    @classmethod
+    def _title_role_match(cls, job: Job, profile: Profile):
 
         job_title = cls._normalize_text(
             job.title or ""

@@ -181,3 +181,55 @@ class TestApplyNowNeedsAVisaSignal(unittest.TestCase):
             job = bucket(target_category="good_target", match_score=85, experience_match_score=100,
                          eligibility_positives=[sign])
             self.assertEqual(job.application_bucket, "apply_with_research", sign)
+
+
+class TestYourLabelsOct20(unittest.TestCase):
+    """From your first 84 labels (labels.py)."""
+
+    def test_not_your_field(self):
+        from candidate_profile import PROFILE
+
+        for title in ("Robotics Software Engineer", "Forward Deployed Engineer (Full-Stack)",
+                      "Founding Full Stack AI Engineer", "Software Engineer - ML Systems & AI Infrastructure",
+                      "Senior Full-Stack Engineer (AI Platform Development)",
+                      "Senior Software Engineer, C++ Backend Development", "AI Product Engineer (Demo)",
+                      "Senior Product Engineer (Voice AI) - Full Lifecycle Ownership"):
+            score = JobMatcher.match_role(Job(id="x", title=title), PROFILE)["score"]
+            self.assertLess(score, 50, title)
+
+    def test_still_your_field(self):
+        from candidate_profile import PROFILE
+
+        for title in ("Full-Stack Software Engineer (AI Focus)", "Full-Stack Developer | Node.js | AI Builder",
+                      "Software Engineer - AI & Productivity Solutions",
+                      "Senior SAP Full-Stack Developer (SAPUI5/Fiori & CAP)",
+                      "Graduate Programme 2027: Applied AI Engineer",
+                      "Graduate Programme 2027: Technology Services Specialist (IT Systems Engineer)"):
+            score = JobMatcher.match_role(Job(id="x", title=title), PROFILE)["score"]
+            self.assertGreaterEqual(score, 50, title)
+
+    def test_visa_wording(self):
+        from services.eligibility_analyzer import analyze_visa
+
+        cases = {
+            "Visa sponsorship is available for exceptional candidates.": "maybe",
+            "Critical Skills sponsorship can be supported.": "maybe",
+            "Applicants must be legally authorized to work in Switzerland or be eligible to obtain the "
+            "required Swiss work authorization without employer-sponsored visa support.": "no",
+            "We offer visa sponsorship and relocation.": "yes",
+            "We can sponsor your visa.": "yes",
+        }
+        for text, expected in cases.items():
+            self.assertEqual(analyze_visa(text)["visa_status"], expected, text)
+
+    def test_board_flag_is_a_maybe_and_jaabz_summary_is_not_used_for_visa(self):
+        from services.eligibility_analyzer import EligibilityAnalyzer
+
+        flagged = Job(id="jz-1", title="Developer", description=LONG_AD, source_hint="visa")
+        EligibilityAnalyzer.analyze(flagged)
+        self.assertEqual(flagged.visa_sponsorship_status, "maybe")
+
+        summary = Job(id="jz-2", title="Developer",
+                      description=LONG_AD + "\n\nSummary on Jaabz:\nBenefits & Perks\nVisa sponsorship provided")
+        EligibilityAnalyzer.analyze(summary)
+        self.assertEqual(summary.visa_sponsorship_status, "unknown")

@@ -452,6 +452,8 @@ NEGATIVE_VISA = compile_all([
     r"(?:not|n't|unable to|cannot|can't|won't|will not|do not|does not)\s+(?:\w+\s+){0,3}(?:sponsor|provide visa|offer visa)",
     r"sponsorship (?:is |are )?not (?:available|offered|provided|possible)",
     r"without (?:the need for )?(?:visa )?sponsorship",
+    # "...eligible to obtain Swiss work authorization without employer sponsorship"
+    r"without\W+(?:[\w-]+\W+){0,3}(?:[\w-]*sponsor\w*|visa support)",
     r"keine?n?\s+(?:\w+\s+){0,3}(?:visum|visa|sponsoring|aufenthaltstitel)",
     r"nicht\s+(?:\w+\s+){0,4}(?:sponsern|visum|visa)",
     # "ein Visa- oder Relocation-Sponsoring können wir ... nicht anbieten"
@@ -466,7 +468,13 @@ SOFT_SPONSOR = re.compile(
     r"(?:may|might|could)\W+(?:\w+\W+){0,2}(?:considered|discussed|possible|available|offered)"
     r"|(?:may|might|could)\W+(?:\w+\W+){0,3}(?:consider|offer|provide|support|sponsor)\w*\W+"
     r"(?:\w+\W+){0,3}(?:visa|work permit|blue card)"
-    r"|(?:visa|sponsorship)\W+(?:\w+\W+){0,4}case[- ]by[- ]case",
+    r"|(?:visa|sponsorship)\W+(?:\w+\W+){0,4}case[- ]by[- ]case"
+    # Your labels: "available for exceptional candidates", "can be
+    # supported" are a maybe, not a promise.
+    r"|(?:visa|sponsorship)\W+(?:\w+\W+){0,6}(?:for|to)\s+(?:\w+\s+){0,2}"
+    r"(?:exceptional|outstanding|the right|strong|top)\s+(?:candidates?|applicants?|profiles?|talent)"
+    r"|(?:visa|sponsorship)\W+(?:\w+\W+){0,3}can be (?:supported|considered|discussed|arranged)"
+    r"|in exceptional cases",
     re.IGNORECASE,
 )
 
@@ -1305,6 +1313,10 @@ def analyze_remote_open(location, text, remote_scope=None, source_hint=None) -> 
     return verdict("unknown", None)
 
 
+# Jaabz's summary boxes are added after this line (sources/jaabz.py).
+JAABZ_SUMMARY_MARKER = "Summary on Jaabz:"
+
+
 class EligibilityAnalyzer:
     """
     Fills the eligibility signal fields on a Job.
@@ -1341,8 +1353,19 @@ class EligibilityAnalyzer:
 
         language = detect_language(text)
         german = analyze_german_requirement(text, language)
-        visa = analyze_visa(text)
-        relocation = analyze_relocation(text)
+
+        # Visa and relocation come from the ad itself. Jaabz's own summary
+        # boxes repeat "visa sponsorship" loosely; its flags at the top of
+        # the page are used instead (source_hint "visa" / "relocation").
+        ad_text = text.split(JAABZ_SUMMARY_MARKER)[0]
+        visa = analyze_visa(ad_text)
+        relocation = analyze_relocation(ad_text)
+
+        # The job board marks it as visa sponsored (Jaabz flag, TokyoDev /
+        # Japan Dev "apply from abroad", Relocate.me visa services): a maybe.
+        if visa["visa_status"] == "unknown" and job.source_hint == "visa":
+            visa["visa_status"] = "maybe"
+            visa["visa_evidence"] = "The job board marks it as visa sponsored."
         remote = analyze_remote(job, text)
 
         if job.country == "remote":

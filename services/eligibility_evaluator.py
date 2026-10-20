@@ -82,7 +82,13 @@ class EligibilityEvaluator:
         if sponsored:
             positives.append("VISA_SPONSORSHIP_OFFERED")
 
-        if visa == "maybe":
+        # "maybe" only from the job board's flag (not the ad's words).
+        board_flag = (
+            job.source_hint == "visa"
+            and job.visa_sponsorship_evidence == "The job board marks it as visa sponsored."
+        )
+
+        if visa == "maybe" and not board_flag:
             positives.append("VISA_SPONSORSHIP_POSSIBLE")
 
         if job.work_authorization_required and not sponsored:
@@ -95,7 +101,7 @@ class EligibilityEvaluator:
 
         # What the job board itself says (Jaabz lists visa jobs only).
         # Weaker than the listing's own words, so only a "maybe".
-        board_visa = job.source_hint == "visa" and visa == "unknown"
+        board_visa = job.source_hint == "visa" and (visa == "unknown" or board_flag)
         board_relocation = job.source_hint == "relocation" and relocation == "unknown"
 
         if board_visa:
